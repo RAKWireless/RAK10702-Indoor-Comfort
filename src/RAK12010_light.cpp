@@ -22,7 +22,6 @@ Light_VEML7700 VEML = Light_VEML7700();
  */
 bool init_rak12010(void)
 {
-	Wire.begin();
 	if (!VEML.begin(&Wire))
 	{
 		MYLOG("VEML", "VEML7700 not found");
@@ -59,4 +58,24 @@ void read_rak12010(void)
 #endif
 
 	g_solution_data.addLuminosity(LPP_CHANNEL_LIGHT2, (uint32_t)VEML.readLux());
+}
+
+/**
+ * @brief Wake up RAK12010 from sleep
+ *
+ */
+void startup_rak12010(void)
+{
+	VEML.powerSaveEnable(false);
+	VEML.setIntegrationTime(VEML7700_IT_25MS);
+}
+
+/**
+ * @brief Put the RAK12010 into sleep mode
+ *
+ */
+void shut_down_rak12010(void)
+{
+	VEML.powerSaveEnable(true);
+	VEML.setPowerSaveMode(VEML7700_POWERSAVE_MODE4);
 }

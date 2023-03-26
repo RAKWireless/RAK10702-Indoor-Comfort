@@ -23,14 +23,13 @@ SCD30 scd30;
 bool init_rak12037(void)
 {
 	// Enable power
-	pinMode(CO2_POWER, OUTPUT);
-	digitalWrite(CO2_POWER, HIGH); // power on RAK12037
+	digitalWrite(CO2_PM_POWER, HIGH); // power on RAK12037
 
-	Wire.begin();
+	delay(250);
+	
 	if (!scd30.begin(Wire))
 	{
 		MYLOG("SCD30", "SCD30 not found");
-		// digitalWrite(CO2_POWER, LOW); // power down RAK12037
 		return false;
 	}
 
@@ -60,7 +59,7 @@ void read_rak12037(void)
 	{
 		MYLOG("SCD30", "Waiting for data");
 		delay(500);
-		if ((millis() - start_time) > 5000)
+		if ((millis() - start_time) > 10000)
 		{
 			// timeout, no data available
 			MYLOG("SCD30", "Timeout");
@@ -83,4 +82,23 @@ void read_rak12037(void)
 #if HAS_EPD > 0
 	set_co2_rak14000(co2_reading);
 #endif
+}
+
+/**
+ * @brief Wake up RAK12037 from sleep
+ *
+ */
+void startup_rak12037(void)
+{
+	init_rak12037();
+}
+
+/**
+ * @brief Put the RAK12037 into sleep mode
+ *
+ */
+void shut_down_rak12037(void)
+{
+	// Disable power
+	digitalWrite(CO2_PM_POWER, LOW); // power off RAK12037
 }

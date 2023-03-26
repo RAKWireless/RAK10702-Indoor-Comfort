@@ -34,8 +34,6 @@ float _last_pressure_rak1906 = 0;
  */
 bool init_rak1906(void)
 {
-	Wire.begin();
-
 	if (!bme.begin(0x76))
 	{
 		MYLOG("BME", "Could not find a valid BME680 sensor, check wiring!");
@@ -130,36 +128,4 @@ void get_rak1906_values(float *values)
 	values[1] = _last_humid_rak1906;
 	values[2] = _last_pressure_rak1906;
 }
-
-// /**
-//  * @brief Calculate and return the altitude
-//  *        based on the barometric pressure
-//  *        Requires to have MSL set
-//  *
-//  * @return uint16_t altitude in cm
-//  */
-// uint16_t get_alt_rak1906(void)
-// {
-// 	// Get latest values
-// 	start_rak1906();
-// 	delay(250);
-// 	if (!read_rak1906())
-// 	{
-// 		return 0xFFFF;
-// 	}
-
-// 	MYLOG("BME", "Compute altitude\n");
-// 	// pressure in HPa
-// 	float pressure = bme.pressure / 100.0;
-// 	MYLOG("BME", "P: %.2f MSL: %.2f", bme.pressure / 100.0, at_MSL);
-
-// 	float A = pressure / at_MSL; // (1013.25) by default;
-// 	float B = 1 / 5.25588;
-// 	float C = pow(A, B);
-// 	C = 1.0 - C;
-// 	C = C / 0.0000225577;
-// 	uint16_t new_val = C * 100;
-// 	MYLOG("BME", "Altitude: %.2f m / %d cm", C, new_val);
-// 	return new_val;
-// }
 #endif // USE_BSEC == 0

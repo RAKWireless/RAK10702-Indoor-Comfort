@@ -22,7 +22,6 @@ LPS35HW lps;
  */
 bool init_rak1902(void)
 {
-	Wire.begin();
 	if (!lps.begin(&Wire))
 	{
 		MYLOG("PRESS", "Could not initialize LPS2X on Wire");
@@ -33,12 +32,6 @@ bool init_rak1902(void)
 	lps.setOutputRate(LPS35HW::OutputRate_75Hz);	   // 75 Hz sample rate
 	lps.setLowPassFilter(LPS35HW::LowPassFilter_ODR9); // default is off
 	return true;
-}
-
-void start_rak1902(void)
-{
-	lps.setLowPower(false);						 // Disable low power mode
-	lps.setOutputRate(LPS35HW::OutputRate_75Hz); // 75 Hz sample rate
 }
 
 /**
@@ -78,4 +71,24 @@ float get_rak1902(void)
 	delay(500); // Give the sensor some time
 
 	return lps.readPressure(); // hPa
+}
+
+/**
+ * @brief Wake up RAK1902 from sleep
+ *
+ */
+void startup_rak1902(void)
+{
+	lps.setLowPower(false);						 // Disable low power mode
+	lps.setOutputRate(LPS35HW::OutputRate_75Hz); // 75 Hz sample rate
+}
+
+/**
+ * @brief Put the RAK1902 into sleep mode
+ *
+ */
+void shut_down_rak1902(void)
+{
+	lps.setLowPower(true);
+	lps.setOutputRate(LPS35HW::OutputRate_OneShot); // 75 Hz sample rate
 }

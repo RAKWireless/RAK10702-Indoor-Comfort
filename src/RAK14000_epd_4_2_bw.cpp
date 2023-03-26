@@ -9,42 +9,35 @@
  *
  */
 #include "app.h"
-#if HAS_EPD == 1
-#include <Adafruit_GFX.h>
-#include <Adafruit_EPD.h>
 
 #include "RAK14000_epd.h"
 
-#define SMALL_FONT &RAK_EPD_10pt
-#define LARGE_FONT &RAK_EPD_20pt
+// #define SMALL_FONT &RAK_EPD_10pt
+// #define LARGE_FONT &RAK_EPD_20pt
 
-#define POWER_ENABLE WB_IO2
-#define EPD_MOSI MOSI
-#define EPD_MISO -1 // not use
-#define EPD_SCK SCK
-#define EPD_CS SS
-#define EPD_DC WB_IO1
-#define SRAM_CS -1	 // not use
-#define EPD_RESET -1 // not use
-#define EPD_BUSY WB_IO4
+// #define POWER_ENABLE WB_IO2
+// #define EPD_MOSI MOSI
+// #define EPD_MISO -1 // not use
+// #define EPD_SCK SCK
+// #define EPD_CS SS
+// #define EPD_DC WB_IO1
+// #define SRAM_CS -1	 // not use
+// #define EPD_RESET -1 // not use
+// #define EPD_BUSY WB_IO4
 
-typedef struct DEPG
-{
-	int width;
-	int height;
-} DEPG;
+// DEPG DEPG_HP = {400, 300}; //  this is for 4.2" DEPG0420BNS19AF4 B/W
 
-// DEPG  DEPG_HP = {250,122};  //use 2.13" DEPG0213RWS800F41HP as default B/W/R
-// DEPG  DEPG_HP = {212,104};  //  this is for 2.13" DEPG0213BNS800F42HP B/W
-DEPG DEPG_HP = {400, 300}; //  this is for 4.2" DEPG0420BNS19AF4 B/W
+uint16_t display_width = 400;
+uint16_t display_height = 300;
 
 // 4.2" EPD with SSD1683
-Adafruit_SSD1681 display(DEPG_HP.height, DEPG_HP.width, EPD_MOSI,
+Adafruit_SSD1681 display(display_height, display_width, EPD_MOSI,
 						 EPD_SCK, EPD_DC, EPD_RESET,
 						 EPD_CS, SRAM_CS, EPD_MISO,
 						 EPD_BUSY);
 
 /** Set num_values to 1/4 of the display width */
+
 const uint16_t num_values = 400 / 4;
 uint16_t voc_values[num_values] = {0};
 float temp_values[num_values] = {0.0};
@@ -69,6 +62,8 @@ uint16_t txt_color = EPD_BLACK;
 uint8_t g_air_status = 0;
 bool g_status_changed = true;
 
+bool g_epd_off = false;
+
 /** EPD task handle */
 TaskHandle_t epd_task_handle;
 
@@ -80,9 +75,6 @@ static BaseType_t xHigherPriorityTaskWoken = pdTRUE;
 
 /** Task declaration */
 void epd_task(void *pvParameters);
-
-// Forward declaration
-void rak14000_text(int16_t x, int16_t y, char *text, uint16_t text_color, uint32_t text_size);
 
 // For text length calculations
 int16_t txt_x1;
@@ -104,14 +96,21 @@ uint16_t w_bar;
 float bar_divider;
 uint16_t spacer;
 
+/** Timer to switch off display */
+SoftwareTimer display_off;
+
+/** UI selector. 0 = Icon, 1 = scientific*/
+uint8_t ui_selected = 1;
+
 /**
  * @brief Initialization of RAK14000 EPD
  *
  */
 void init_rak14000(void)
 {
-	pinMode(PM_EPD_POWER, INPUT_PULLUP);
-	digitalWrite(PM_EPD_POWER, HIGH);
+	digitalWrite(EPD_POWER, HIGH);
+
+	g_epd_off = false;
 
 	// Create the EPD event semaphore
 	g_epd_sem = xSemaphoreCreateBinary();
@@ -124,6 +123,9 @@ void init_rak14000(void)
 		MYLOG("EPD", "Failed to start EPD task");
 	}
 	MYLOG("EPD", "Initialized 4.2\" display");
+
+	// Prepare display off timer
+	display_off.begin(5000, shut_down_rak14000, NULL, false);
 }
 
 /**
@@ -144,7 +146,7 @@ void wake_rak14000(void)
    @param text_color color of text
    @param text_size size of text
 */
-void rak14000_text(int16_t x, int16_t y, char *text, uint16_t text_color, uint32_t text_size)
+void text_rak14000(int16_t x, int16_t y, char *text, uint16_t text_color, uint32_t text_size)
 {
 	if (text_size == 1)
 	{
@@ -170,7 +172,22 @@ void rak14000_text(int16_t x, int16_t y, char *text, uint16_t text_color, uint32
 void clear_rak14000(void)
 {
 	display.clearBuffer();
-	display.fillRect(0, 0, DEPG_HP.width, DEPG_HP.height, bg_color);
+	display.fillRect(0, 0, display_width, display_height, bg_color);
+}
+
+/**
+ * @brief Switch the UI to the next version.
+ *			Triggered by button
+ * 
+ */
+void switch_ui(void)
+{
+	ui_selected +=1;
+	if (ui_selected == 2)
+	{
+		ui_selected = 0;
+	}
+	wake_rak14000();
 }
 
 /** Flag for first screen update */
@@ -187,82 +204,100 @@ void refresh_rak14000(void)
 	// Clear display buffer
 	clear_rak14000();
 
-	uint8_t old_air_status = g_air_status;
-
-	g_air_status = 0;
-
-	voc_rak14000();
-	co2_rak14000(found_sensors[PM_ID].found_sensor);
-	temp_rak14000(found_sensors[PM_ID].found_sensor);
-	humid_rak14000(found_sensors[PM_ID].found_sensor);
-	baro_rak14000(found_sensors[PM_ID].found_sensor);
-
-	if (old_air_status != g_air_status)
+	if (ui_selected == 1)
 	{
-		g_status_changed = true;
-	}
-	if (g_air_status == 0)
-	{
-		set_rgb_color(0, 0, 255);
-	}
-	else if (g_air_status == 128)
-	{
-		set_rgb_color(255, 234, 0);
+		scientific_rak14000();
 	}
 	else
 	{
-		set_rgb_color(255, 0, 0);
+		icon_rak14000();
 	}
+	// uint8_t old_air_status = g_air_status;
 
-	display.setFont(SMALL_FONT);
-	display.setTextSize(1);
-	if (found_sensors[RTC_ID].found_sensor)
-	{
-		read_rak12002();
+	// g_air_status = 0;
 
-		if ((found_sensors[PM_ID].found_sensor) || (found_sensors[CO2_ID].found_sensor))
-		{
-			snprintf(disp_text, 59, "RAK10702   %s %d %d %02d:%02d",
-					 months_txt[g_date_time.month - 1], g_date_time.date, g_date_time.year,
-					 g_date_time.hour, g_date_time.minute);
-		}
-		else
-		{
-			snprintf(disp_text, 59, "RAK10702   %s %d %d %02d:%02d Batt: %.2f V",
-					 months_txt[g_date_time.month - 1], g_date_time.date, g_date_time.year,
-					 g_date_time.hour, g_date_time.minute,
-					 read_batt() / 1000.0);
-		}
-	}
-	else
-	{
-		if ((found_sensors[PM_ID].found_sensor) || (found_sensors[CO2_ID].found_sensor))
-		{
-			snprintf(disp_text, 59, "RAK10702 Air Quality");
-		}
-		else
-		{
-			snprintf(disp_text, 59, "RAK10702 Air Quality Batt: %.2f V",
-					 read_batt() / 1000.0);
-		}
-	}
+	// bool has_pm = found_sensors[PM_ID].found_sensor;
+	// bool has_baro = false;
+	// if ((found_sensors[ENV_ID].found_sensor) || (found_sensors[PRESS_ID].found_sensor))
+	// {
+	// 	has_baro = true;
+	// }
+	// voc_rak14000();
+	// co2_rak14000(has_pm);
+	// temp_rak14000(has_pm, has_baro);
+	// humid_rak14000(has_pm, has_baro);
+	// if (has_baro)
+	// {
+	// 	baro_rak14000(has_pm);
+	// }
 
-	display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-	rak14000_text((DEPG_HP.width / 2) - (txt_w / 2), 1, disp_text, (uint16_t)txt_color, 1);
+	// if (old_air_status != g_air_status)
+	// {
+	// 	g_status_changed = true;
+	// }
+	// if (g_air_status == 0)
+	// {
+	// 	set_rgb_color(0, 0, 255);
+	// }
+	// else if (g_air_status == 128)
+	// {
+	// 	set_rgb_color(255, 234, 0);
+	// }
+	// else
+	// {
+	// 	set_rgb_color(255, 0, 0);
+	// }
 
-	if (found_sensors[PM_ID].found_sensor)
-	{
-		pm_rak14000();
-		display.drawLine(0, DEPG_HP.height / 2 + 3, DEPG_HP.width / 2 + 50, DEPG_HP.height / 2 + 3, (uint16_t)txt_color);
-		display.drawLine(DEPG_HP.width / 2 + 50, DEPG_HP.height / 5, DEPG_HP.width, DEPG_HP.height / 5, (uint16_t)txt_color);
-		display.drawLine(DEPG_HP.width / 2 + 50, 10, DEPG_HP.width / 2 + 50, DEPG_HP.height, (uint16_t)txt_color);
-	}
-	else
-	{
-		display.drawLine(DEPG_HP.width / 2 + 50, 10, DEPG_HP.width / 2 + 50, DEPG_HP.height, (uint16_t)txt_color);
-		display.drawLine(DEPG_HP.width / 2 + 50, DEPG_HP.height / 3, DEPG_HP.width, DEPG_HP.height / 3, (uint16_t)txt_color);
-		display.drawLine(DEPG_HP.width / 2 + 50, DEPG_HP.height / 3 * 2, DEPG_HP.width, DEPG_HP.height / 3 * 2, (uint16_t)txt_color);
-	}
+	// display.setFont(SMALL_FONT);
+	// display.setTextSize(1);
+	// if (found_sensors[RTC_ID].found_sensor)
+	// {
+	// 	read_rak12002();
+
+	// 	if ((found_sensors[PM_ID].found_sensor) || (found_sensors[CO2_ID].found_sensor))
+	// 	{
+	// 		snprintf(disp_text, 59, "RAK10702   %s %d %d %02d:%02d",
+	// 				 months_txt[g_date_time.month - 1], g_date_time.date, g_date_time.year,
+	// 				 g_date_time.hour, g_date_time.minute);
+	// 	}
+	// 	else
+	// 	{
+	// 		snprintf(disp_text, 59, "RAK10702   %s %d %d %02d:%02d Batt: %.2f V",
+	// 				 months_txt[g_date_time.month - 1], g_date_time.date, g_date_time.year,
+	// 				 g_date_time.hour, g_date_time.minute,
+	// 				 read_batt() / 1000.0);
+	// 	}
+	// }
+	// else
+	// {
+	// 	if ((found_sensors[PM_ID].found_sensor) || (found_sensors[CO2_ID].found_sensor))
+	// 	{
+	// 		snprintf(disp_text, 59, "RAK10702 Air Quality");
+	// 	}
+	// 	else
+	// 	{
+	// 		snprintf(disp_text, 59, "RAK10702 Air Quality Batt: %.2f V",
+	// 				 read_batt() / 1000.0);
+	// 	}
+	// }
+
+	// display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
+	// text_rak14000((display_width / 2) - (txt_w / 2), 1, disp_text, (uint16_t)txt_color, 1);
+
+	// if (found_sensors[PM_ID].found_sensor)
+	// {
+	// 	pm_rak14000();
+	// 	display.drawLine(0, display_height / 2 + 3, display_width / 2 + 50, display_height / 2 + 3, (uint16_t)txt_color);
+	// 	display.drawLine(display_width / 2 + 50, display_height / 5, display_width, display_height / 5, (uint16_t)txt_color);
+	// 	display.drawLine(display_width / 2 + 50, 10, display_width / 2 + 50, display_height, (uint16_t)txt_color);
+	// }
+	// else
+	// {
+	// 	display.drawLine(display_width / 2 + 50, 10, display_width / 2 + 50, display_height, (uint16_t)txt_color);
+	// 	display.drawLine(display_width / 2 + 50, display_height / 3, display_width, display_height / 3, (uint16_t)txt_color);
+	// 	display.drawLine(display_width / 2 + 50, display_height / 3 * 2, display_width, display_height / 3 * 2, (uint16_t)txt_color);
+	// }
+
 	// For partial update only
 	// if (first_time)
 	// {
@@ -270,6 +305,7 @@ void refresh_rak14000(void)
 	// 	display.display(true);
 	// }
 	// return;
+
 	delay(100);
 	display.display();
 	delay(100);
@@ -294,9 +330,7 @@ void status_rak14000(void)
 	}
 
 	display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-	rak14000_text((DEPG_HP.width / 2) - (txt_w / 2), 1, disp_text, (uint16_t)txt_color, 1);
-
-
+	text_rak14000((display_width / 2) - (txt_w / 2), 1, disp_text, (uint16_t)txt_color, 1);
 }
 
 /**
@@ -455,514 +489,528 @@ void set_pm_rak14000(uint16_t pm10_env, uint16_t pm25_env, uint16_t pm100_env)
 	pm_idx++;
 }
 
-/**
- * @brief Update display for VOC values
- *
- * @param full unused
- */
-void voc_rak14000(void)
-{
-	x_text = 2;
-	y_text = 10;
-	s_text = 2;
-	x_graph = 0;
-	y_graph = 60;
-	h_bar = DEPG_HP.height / 2 - 60;
-	w_bar = 2;
-	bar_divider = 500.0 / h_bar;
-
-	// Write value
-	display.drawBitmap(x_text, y_text, voc_img, 32, 32, txt_color);
-
-	if (!voc_valid)
-	{
-		snprintf(disp_text, 29, "VOC na");
-	}
-	else
-	{
-		if (voc_values[voc_idx - 1] > 400)
-		{
-			snprintf(disp_text, 29, " !!  VOC %d", voc_values[voc_idx - 1]);
-			if (g_air_status < 255)
-			{
-				g_air_status = 255;
-			}
-		}
-		else if (voc_values[voc_idx - 1] > 250)
-		{
-			snprintf(disp_text, 29, " !  VOC %d", voc_values[voc_idx - 1]);
-			if (g_air_status < 128)
-			{
-				g_air_status = 128;
-			}
-		}
-		else
-		{
-			snprintf(disp_text, 29, "VOC %d", voc_values[voc_idx - 1]);
-		}
-	}
-	rak14000_text(x_text + 40, y_text + 20, disp_text, txt_color, s_text);
-
-	rak14000_text(DEPG_HP.width / 2 + 15, y_graph + h_bar - 7, (char *)"0", txt_color, 1);
-	rak14000_text(DEPG_HP.width / 2 + 15, y_graph - 7, (char *)"500", txt_color, 1);
-
-	display.drawLine(DEPG_HP.width / 2 + 10, y_graph + h_bar, DEPG_HP.width / 2 + 10, y_graph, (uint16_t)txt_color);
-	display.drawLine(DEPG_HP.width / 2 + 5, y_graph + h_bar, DEPG_HP.width / 2 + 10, y_graph + h_bar, (uint16_t)txt_color);
-	display.drawLine(DEPG_HP.width / 2 + 5, y_graph, DEPG_HP.width / 2 + 10, y_graph, (uint16_t)txt_color);
-
-	// Draw VOC values
-	for (int idx = 0; idx < num_values; idx++)
-	{
-		display.drawLine((int16_t)(x_graph + (idx * w_bar)),
-						 (int16_t)(y_graph + ((h_bar) - (voc_values[idx] / bar_divider))),
-						 (int16_t)(x_graph + (idx * w_bar)),
-						 (int16_t)(y_graph + h_bar),
-						 txt_color);
-	}
-	display.drawLine(x_graph, y_graph + h_bar, x_graph + DEPG_HP.width / 2, y_graph + h_bar, (uint16_t)txt_color);
-
-	// For partial update only
-	// MYLOG("EPD", "Updating x1 %d y1 %d x2 %d y2 %d", x_text, y_text, x_text + w_text, y_text + h_text);
-	// display.displayPartial(x_text, y_text, x_text + w_text, y_text + h_text);
-}
-
-/**
- * @brief Update display for CO2 values
- *
- * @param full unused
- */
-void co2_rak14000(bool has_pm)
-{
-	if (has_pm)
-	{
-		x_text = DEPG_HP.width / 2 + 53;
-		y_text = 15;
-		s_text = 2;
-		spacer = 20;
-
-		// Write value
-		display.drawBitmap(x_text, y_text, co2_img, 32, 32, txt_color);
-
-		snprintf(disp_text, 29, "ppm");
-		display.setFont(SMALL_FONT);
-		display.setTextSize(1);
-		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-
-		rak14000_text(DEPG_HP.width - txt_w - 1, y_text + spacer + 4, disp_text, (uint16_t)txt_color, 1);
-
-		if (co2_values[co2_idx - 1] > 1500)
-		{
-			snprintf(disp_text, 29, "!! %.0f", co2_values[co2_idx - 1]);
-			if (g_air_status < 255)
-			{
-				g_air_status = 255;
-			}
-		}
-		else if (co2_values[co2_idx - 1] > 1000)
-		{
-			snprintf(disp_text, 29, "! %.0f", co2_values[co2_idx - 1]);
-			if (g_air_status < 128)
-			{
-				g_air_status = 128;
-			}
-		}
-		else
-		{
-			snprintf(disp_text, 29, "%.0f", co2_values[co2_idx - 1]);
-		}
-
-		display.setFont(LARGE_FONT);
-		display.setTextSize(1);
-		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w2, &txt_h);
-
-		rak14000_text(DEPG_HP.width - txt_w - txt_w2 - 4, y_text + spacer, disp_text, (uint16_t)txt_color, s_text);
-	}
-	else
-	{
-		x_text = 2;
-		y_text = DEPG_HP.height / 2;
-		s_text = 2;
-		x_graph = 0;
-		y_graph = DEPG_HP.height / 2 + 60;
-		h_bar = DEPG_HP.height / 2 - 62;
-		w_bar = 2;
-		bar_divider = 2500 / h_bar;
-
-		// Get min and max values => maybe adjust graph to the min and max values
-		int fmin = 2500;
-		int fmax = 0;
-		for (int idx = 0; idx < co2_idx; idx++)
-		{
-			if (co2_values[idx] <= fmin)
-			{
-				fmin = co2_values[idx];
-			}
-			if (co2_values[idx] >= fmax)
-			{
-				fmax = co2_values[idx];
-			}
-		}
-		// give some margin at the top
-		fmax += 50;
-
-		// give some margin at the bottom
-		if (fmin > 50)
-		{
-			fmin -= 50;
-		}
-		// make it an even number
-		fmax = ((fmax / 100) + 1) * 100;
-		bar_divider = fmax / h_bar;
-
-		MYLOG("EPD", "CO2 min %d max %d", fmin, fmax);
-
-		// Write value
-		display.drawBitmap(x_text, y_text, co2_img, 32, 32, txt_color);
-
-		if (co2_values[co2_idx - 1] > 1500)
-		{
-			snprintf(disp_text, 29, "!!  %.0f", co2_values[co2_idx - 1]);
-			if (g_air_status < 255)
-			{
-				g_air_status = 255;
-			}
-		}
-		else if (co2_values[co2_idx - 1] > 1000)
-		{
-			snprintf(disp_text, 29, "!  %.0f", co2_values[co2_idx - 1]);
-			if (g_air_status < 128)
-			{
-				g_air_status = 128;
-			}
-		}
-		else
-		{
-			snprintf(disp_text, 29, "%.0f", co2_values[co2_idx - 1]);
-		}
-		rak14000_text(x_text + 40, y_text + 20, disp_text, txt_color, s_text);
-		display.setFont(LARGE_FONT);
-		display.setTextSize(1);
-		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w2, &txt_h);
-
-		rak14000_text(x_text + 40 + txt_w2 + 3, y_text + 24, (char *)"ppm", txt_color, 1);
-
-		sprintf(disp_text, "%d", fmax);
-		rak14000_text(DEPG_HP.width / 2 + 15, y_graph + h_bar - 17, (char *)"200", txt_color, 1);
-		rak14000_text(DEPG_HP.width / 2 + 15, y_graph + h_bar - 7, (char *)"ppm", txt_color, 1);
-		// rak14000_text(DEPG_HP.width / 2 + 15, y_graph + h_bar - 7, (char *)"0ppm", txt_color, 1);
-		rak14000_text(DEPG_HP.width / 2 + 15, y_graph - 7, disp_text, txt_color, 1);
-		rak14000_text(DEPG_HP.width / 2 + 15, y_graph + 3, (char *)"ppm", txt_color, 1);
-
-		display.drawLine(DEPG_HP.width / 2 + 10, y_graph + h_bar, DEPG_HP.width / 2 + 10, y_graph, (uint16_t)txt_color);
-		display.drawLine(DEPG_HP.width / 2 + 5, y_graph + h_bar, DEPG_HP.width / 2 + 10, y_graph + h_bar, (uint16_t)txt_color);
-		display.drawLine(DEPG_HP.width / 2 + 5, y_graph, DEPG_HP.width / 2 + 10, y_graph, (uint16_t)txt_color);
-
-		// Draw CO2 values
-		for (int idx = 0; idx < num_values; idx++)
-		{
-			// if (co2_values[idx] != 0.0)
-			if (co2_values[idx] >= 200.0)
-			{
-				display.drawLine((int16_t)(x_graph + (idx * w_bar)),
-								 //  (int16_t)(y_graph + ((h_bar) - (co2_values[idx] / bar_divider))),
-								 (int16_t)(y_graph + ((h_bar) - ((co2_values[idx] - 200) / bar_divider))),
-								 (int16_t)(x_graph + (idx * w_bar)),
-								 (int16_t)(y_graph + h_bar),
-								 txt_color);
-			}
-		}
-		display.drawLine(x_graph, y_graph + h_bar, x_graph + DEPG_HP.width / 2, y_graph + h_bar, (uint16_t)txt_color);
-
-		// For partial update only
-		// MYLOG("EPD", "Updating x1 %d y1 %d x2 %d y2 %d", x_text, y_text, x_text + w_text, y_text + h_text);
-		// display.displayPartial(x_text, y_text, x_text + w_text, y_text + h_text);
-	}
-}
-
-/**
- * @brief Update display with particle matter values
- *
- * @param full unused
- */
-void pm_rak14000(void)
-{
-	x_text = DEPG_HP.width / 2 + 53;
-	y_text = DEPG_HP.height / 4;
-	s_text = 2;
-
-	// Write value
-	display.drawBitmap(x_text, y_text, pm_img, 32, 32, txt_color);
-
-	snprintf(disp_text, 29, "PM");
-	rak14000_text(x_text + 40, y_text + 20, disp_text, txt_color, s_text);
-
-	// PM 1.0 levels
-	if (pm10_values[pm_idx - 1] > 75)
-	{
-		snprintf(disp_text, 29, "1.0: !!");
-		if (g_air_status < 255)
-		{
-			g_air_status = 255;
-		}
-	}
-	else if (pm10_values[pm_idx - 1] > 35)
-	{
-		snprintf(disp_text, 29, "1.0: !");
-		if (g_air_status < 128)
-		{
-			g_air_status = 128;
-		}
-	}
-	else
-	{
-		snprintf(disp_text, 29, "1.0:");
-	}
-	rak14000_text(x_text, y_text + 60, disp_text, txt_color, s_text);
-
-	snprintf(disp_text, 29, "%d", pm10_values[pm_idx - 1]);
-	display.setFont(LARGE_FONT);
-	display.setTextSize(1);
-	display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-	rak14000_text(DEPG_HP.width - txt_w - 45, y_text + 60, disp_text, txt_color, s_text);
-	snprintf(disp_text, 29, "%cg/m%c", 0x7F, 0x80);
-	rak14000_text(DEPG_HP.width - 38, y_text + 65, disp_text, txt_color, 1);
-
-	// PM 2.5 levels
-	if (pm25_values[pm_idx - 1] > 75)
-	{
-		snprintf(disp_text, 29, "2.5: !!");
-		if (g_air_status < 255)
-		{
-			g_air_status = 255;
-		}
-	}
-	else if (pm25_values[pm_idx - 1] > 35)
-	{
-		snprintf(disp_text, 29, "2.5: !");
-		if (g_air_status < 128)
-		{
-			g_air_status = 128;
-		}
-	}
-	else
-	{
-		snprintf(disp_text, 29, "2.5:");
-	}
-	rak14000_text(x_text, y_text + 120, disp_text, txt_color, s_text);
-
-	snprintf(disp_text, 29, "%d", pm25_values[pm_idx - 1]);
-	display.setFont(LARGE_FONT);
-	display.setTextSize(1);
-	display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-	rak14000_text(DEPG_HP.width - txt_w - 45, y_text + 120, disp_text, txt_color, s_text);
-	snprintf(disp_text, 29, "%cg/m%c", 0x7F, 0x80);
-	rak14000_text(DEPG_HP.width - 38, y_text + 125, disp_text, txt_color, 1);
-
-	// PM 10 levels
-	if (pm100_values[pm_idx - 1] > 199)
-	{
-		snprintf(disp_text, 29, "10: !!");
-		if (g_air_status < 255)
-		{
-			g_air_status = 255;
-		}
-	}
-	else if (pm100_values[pm_idx - 1] > 150)
-	{
-		snprintf(disp_text, 29, "10: !");
-		if (g_air_status < 128)
-		{
-			g_air_status = 128;
-		}
-	}
-	else
-	{
-		snprintf(disp_text, 29, "10:");
-	}
-	rak14000_text(x_text, y_text + 180, disp_text, txt_color, s_text);
-
-	snprintf(disp_text, 29, "%d", pm100_values[pm_idx - 1]);
-	display.setFont(LARGE_FONT);
-	display.setTextSize(1);
-	display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-	rak14000_text(DEPG_HP.width - txt_w - 45, y_text + 180, disp_text, txt_color, s_text);
-	snprintf(disp_text, 29, "%cg/m%c", 0x7F, 0x80);
-	rak14000_text(DEPG_HP.width - 38, y_text + 185, disp_text, txt_color, 1);
-}
-
-/**
- * @brief Update display for temperature values
- *
- * @param full unused
- */
-void temp_rak14000(bool has_pm)
-{
-	x_text = 25;
-	y_text = DEPG_HP.height / 2 + 10;
-	s_text = 2;
-	spacer = 60;
-
-	// If PM sensor is not available, position is different
-	if (!has_pm)
-	{
-		x_text = DEPG_HP.width / 2 + 53;
-		y_text = 12;
-		s_text = 2;
-		spacer = 50;
-
-		// Write value
-		display.drawBitmap(DEPG_HP.width - (DEPG_HP.width / 4 - 16), y_text, celsius_img, 32, 32, txt_color);
-
-		snprintf(disp_text, 29, "~C");
-		display.setFont(SMALL_FONT);
-		display.setTextSize(1);
-		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-
-		rak14000_text(DEPG_HP.width - txt_w - 3, y_text + spacer + 4, disp_text, (uint16_t)txt_color, 1);
-
-		snprintf(disp_text, 29, "%.2f ", temp_values[temp_idx - 1]);
-		display.setFont(LARGE_FONT);
-		display.setTextSize(1);
-		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w2, &txt_h);
-
-		rak14000_text(DEPG_HP.width - txt_w - txt_w2 - 6, y_text + spacer, disp_text, (uint16_t)txt_color, s_text);
-	}
-	else
-	{
-		// Write value
-		display.drawBitmap(x_text, y_text, celsius_img, 32, 32, txt_color);
-
-		snprintf(disp_text, 29, "%.2f", temp_values[temp_idx - 1]);
-
-		display.setFont(LARGE_FONT);
-		display.setTextSize(1);
-		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-
-		rak14000_text(x_text + spacer, y_text + 16, disp_text, (uint16_t)txt_color, s_text);
-
-		snprintf(disp_text, 29, "~C");
-		rak14000_text(x_text + spacer + txt_w + 4, y_text + 16 + 4, disp_text, (uint16_t)txt_color, 1);
-	}
-}
-
-/**
- * @brief Update display for humidity values
- *
- * @param full unused
- */
-void humid_rak14000(bool has_pm)
-{
-	uint16_t x_text = 25;
-	uint16_t y_text = DEPG_HP.height / 2 + (DEPG_HP.height / 2 / 3) + 10;
-	uint16_t s_text = 2;
-	uint16_t spacer = 60;
-
-	// If PM sensor is not available, position is different
-	if (!has_pm)
-	{
-		x_text = DEPG_HP.width / 2 + 53;
-		y_text = DEPG_HP.height / 3 + 15;
-		s_text = 2;
-		spacer = 50;
-
-		// Write value
-		display.drawBitmap(DEPG_HP.width - (DEPG_HP.width / 4 - 16), y_text, humidity_img, 32, 32, txt_color);
-
-		snprintf(disp_text, 29, "%%RH");
-		display.setFont(SMALL_FONT);
-		display.setTextSize(1);
-		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-
-		rak14000_text(DEPG_HP.width - txt_w - 3, y_text + spacer + 4, disp_text, (uint16_t)txt_color, 1);
-
-		snprintf(disp_text, 29, "%.2f ", humid_values[humid_idx - 1]);
-		display.setFont(LARGE_FONT);
-		display.setTextSize(1);
-		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w2, &txt_h);
-
-		rak14000_text(DEPG_HP.width - txt_w - txt_w2 - 6, y_text + spacer, disp_text, (uint16_t)txt_color, s_text);
-	}
-	else
-	{
-		// Write value
-		display.drawBitmap(x_text, y_text, humidity_img, 32, 32, txt_color);
-
-		snprintf(disp_text, 29, "%.2f", humid_values[humid_idx - 1]);
-
-		display.setFont(LARGE_FONT);
-		display.setTextSize(1);
-		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-
-		rak14000_text(x_text + spacer, y_text + 16, disp_text, (uint16_t)txt_color, s_text);
-
-		snprintf(disp_text, 29, "%%RH");
-		rak14000_text(x_text + spacer + txt_w + 4, y_text + 16 + 4, disp_text, (uint16_t)txt_color, 1);
-	}
-}
-
-/**
- * @brief Update display for barometric pressure
- *
- * @param full unused
- */
-void baro_rak14000(bool has_pm)
-{
-	x_text = 25;
-	y_text = DEPG_HP.height / 2 + (DEPG_HP.height / 2 / 3 * 2) + 10;
-	s_text = 2;
-	spacer = 60;
-
-	// If PM sensor is not available, position is different
-	if (!has_pm)
-	{
-		x_text = DEPG_HP.width / 2 + 53;
-		y_text = DEPG_HP.height / 3 * 2 + 15;
-		s_text = 2;
-		spacer = 50;
-
-		// Write value
-		display.drawBitmap(DEPG_HP.width - (DEPG_HP.width / 4 - 16), y_text, barometer_img, 32, 32, txt_color);
-
-		snprintf(disp_text, 29, "mBar");
-		display.setFont(SMALL_FONT);
-		display.setTextSize(1);
-		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-
-		rak14000_text(DEPG_HP.width - txt_w - 3, y_text + spacer + 4, disp_text, (uint16_t)txt_color, 1);
-
-		snprintf(disp_text, 29, "%.1f ", baro_values[baro_idx - 1]);
-		display.setFont(LARGE_FONT);
-		display.setTextSize(1);
-		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w2, &txt_h);
-
-		rak14000_text(DEPG_HP.width - txt_w - txt_w2 - 6, y_text + spacer, disp_text, (uint16_t)txt_color, s_text);
-	}
-	else
-	{
-		// Write value
-		display.drawBitmap(x_text, y_text, barometer_img, 32, 32, txt_color);
-
-		snprintf(disp_text, 29, "%.2f", baro_values[baro_idx - 1]);
-
-		display.setFont(LARGE_FONT);
-		display.setTextSize(1);
-		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-
-		rak14000_text(x_text + spacer, y_text + 16, disp_text, (uint16_t)txt_color, s_text);
-
-		snprintf(disp_text, 29, "mBar");
-		rak14000_text(x_text + spacer + txt_w + 4, y_text + 16 + 4, disp_text, (uint16_t)txt_color, 1);
-	}
-}
-
-void rak14000_start_screen(void)
+// /**
+//  * @brief Update display for VOC values
+//  *
+//  * @param full unused
+//  */
+// void voc_rak14000(void)
+// {
+// 	x_text = 2;
+// 	y_text = 10;
+// 	s_text = 2;
+// 	x_graph = 0;
+// 	y_graph = 60;
+// 	h_bar = display_height / 2 - 60;
+// 	w_bar = 2;
+// 	bar_divider = 500.0 / h_bar;
+
+// 	// Write value
+// 	display.drawBitmap(x_text, y_text, voc_img, 32, 32, txt_color);
+
+// 	if (!voc_valid)
+// 	{
+// 		snprintf(disp_text, 29, "VOC na");
+// 	}
+// 	else
+// 	{
+// 		if (voc_values[voc_idx - 1] > 400)
+// 		{
+// 			snprintf(disp_text, 29, " !!  VOC %d", voc_values[voc_idx - 1]);
+// 			if (g_air_status < 255)
+// 			{
+// 				g_air_status = 255;
+// 			}
+// 		}
+// 		else if (voc_values[voc_idx - 1] > 250)
+// 		{
+// 			snprintf(disp_text, 29, " !  VOC %d", voc_values[voc_idx - 1]);
+// 			if (g_air_status < 128)
+// 			{
+// 				g_air_status = 128;
+// 			}
+// 		}
+// 		else
+// 		{
+// 			snprintf(disp_text, 29, "VOC %d", voc_values[voc_idx - 1]);
+// 		}
+// 	}
+// 	text_rak14000(x_text + 40, y_text + 20, disp_text, txt_color, s_text);
+
+// 	text_rak14000(display_width / 2 + 15, y_graph + h_bar - 7, (char *)"0", txt_color, 1);
+// 	text_rak14000(display_width / 2 + 15, y_graph - 7, (char *)"500", txt_color, 1);
+
+// 	display.drawLine(display_width / 2 + 10, y_graph + h_bar, display_width / 2 + 10, y_graph, (uint16_t)txt_color);
+// 	display.drawLine(display_width / 2 + 5, y_graph + h_bar, display_width / 2 + 10, y_graph + h_bar, (uint16_t)txt_color);
+// 	display.drawLine(display_width / 2 + 5, y_graph, display_width / 2 + 10, y_graph, (uint16_t)txt_color);
+
+// 	// Draw VOC values
+// 	for (int idx = 0; idx < num_values; idx++)
+// 	{
+// 		display.drawLine((int16_t)(x_graph + (idx * w_bar)),
+// 						 (int16_t)(y_graph + ((h_bar) - (voc_values[idx] / bar_divider))),
+// 						 (int16_t)(x_graph + (idx * w_bar)),
+// 						 (int16_t)(y_graph + h_bar),
+// 						 txt_color);
+// 	}
+// 	display.drawLine(x_graph, y_graph + h_bar, x_graph + display_width / 2, y_graph + h_bar, (uint16_t)txt_color);
+
+// 	// For partial update only
+// 	// MYLOG("EPD", "Updating x1 %d y1 %d x2 %d y2 %d", x_text, y_text, x_text + w_text, y_text + h_text);
+// 	// display.displayPartial(x_text, y_text, x_text + w_text, y_text + h_text);
+// }
+
+// /**
+//  * @brief Update display for CO2 values
+//  *
+//  * @param full unused
+//  */
+// void co2_rak14000(bool has_pm)
+// {
+// 	if (has_pm)
+// 	{
+// 		x_text = display_width / 2 + 53;
+// 		y_text = 15;
+// 		s_text = 2;
+// 		spacer = 20;
+
+// 		// Write value
+// 		display.drawBitmap(x_text, y_text, co2_img, 32, 32, txt_color);
+
+// 		snprintf(disp_text, 29, "ppm");
+// 		display.setFont(SMALL_FONT);
+// 		display.setTextSize(1);
+// 		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
+
+// 		text_rak14000(display_width - txt_w - 1, y_text + spacer + 4, disp_text, (uint16_t)txt_color, 1);
+
+// 		if (co2_values[co2_idx - 1] > 1500)
+// 		{
+// 			snprintf(disp_text, 29, "!! %.0f", co2_values[co2_idx - 1]);
+// 			if (g_air_status < 255)
+// 			{
+// 				g_air_status = 255;
+// 			}
+// 		}
+// 		else if (co2_values[co2_idx - 1] > 1000)
+// 		{
+// 			snprintf(disp_text, 29, "! %.0f", co2_values[co2_idx - 1]);
+// 			if (g_air_status < 128)
+// 			{
+// 				g_air_status = 128;
+// 			}
+// 		}
+// 		else
+// 		{
+// 			snprintf(disp_text, 29, "%.0f", co2_values[co2_idx - 1]);
+// 		}
+
+// 		display.setFont(LARGE_FONT);
+// 		display.setTextSize(1);
+// 		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w2, &txt_h);
+
+// 		text_rak14000(display_width - txt_w - txt_w2 - 4, y_text + spacer, disp_text, (uint16_t)txt_color, s_text);
+// 	}
+// 	else
+// 	{
+// 		x_text = 2;
+// 		y_text = display_height / 2;
+// 		s_text = 2;
+// 		x_graph = 0;
+// 		y_graph = display_height / 2 + 60;
+// 		h_bar = display_height / 2 - 62;
+// 		w_bar = 2;
+// 		bar_divider = 2500 / h_bar;
+
+// 		// Get min and max values => maybe adjust graph to the min and max values
+// 		int fmin = 2500;
+// 		int fmax = 0;
+// 		for (int idx = 0; idx < co2_idx; idx++)
+// 		{
+// 			if (co2_values[idx] <= fmin)
+// 			{
+// 				fmin = co2_values[idx];
+// 			}
+// 			if (co2_values[idx] >= fmax)
+// 			{
+// 				fmax = co2_values[idx];
+// 			}
+// 		}
+// 		// give some margin at the top
+// 		fmax += 50;
+
+// 		// give some margin at the bottom
+// 		if (fmin > 50)
+// 		{
+// 			fmin -= 50;
+// 		}
+// 		// make it an even number
+// 		fmax = ((fmax / 100) + 1) * 100;
+// 		bar_divider = fmax / h_bar;
+
+// 		MYLOG("EPD", "CO2 min %d max %d", fmin, fmax);
+
+// 		// Write value
+// 		display.drawBitmap(x_text, y_text, co2_img, 32, 32, txt_color);
+
+// 		if (co2_values[co2_idx - 1] > 1500)
+// 		{
+// 			snprintf(disp_text, 29, "!!  %.0f", co2_values[co2_idx - 1]);
+// 			if (g_air_status < 255)
+// 			{
+// 				g_air_status = 255;
+// 			}
+// 		}
+// 		else if (co2_values[co2_idx - 1] > 1000)
+// 		{
+// 			snprintf(disp_text, 29, "!  %.0f", co2_values[co2_idx - 1]);
+// 			if (g_air_status < 128)
+// 			{
+// 				g_air_status = 128;
+// 			}
+// 		}
+// 		else
+// 		{
+// 			snprintf(disp_text, 29, "%.0f", co2_values[co2_idx - 1]);
+// 		}
+// 		text_rak14000(x_text + 40, y_text + 20, disp_text, txt_color, s_text);
+// 		display.setFont(LARGE_FONT);
+// 		display.setTextSize(1);
+// 		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w2, &txt_h);
+
+// 		text_rak14000(x_text + 40 + txt_w2 + 3, y_text + 24, (char *)"ppm", txt_color, 1);
+
+// 		sprintf(disp_text, "%d", fmax);
+// 		text_rak14000(display_width / 2 + 15, y_graph + h_bar - 17, (char *)"200", txt_color, 1);
+// 		text_rak14000(display_width / 2 + 15, y_graph + h_bar - 7, (char *)"ppm", txt_color, 1);
+// 		// text_rak14000(display_width / 2 + 15, y_graph + h_bar - 7, (char *)"0ppm", txt_color, 1);
+// 		text_rak14000(display_width / 2 + 15, y_graph - 7, disp_text, txt_color, 1);
+// 		text_rak14000(display_width / 2 + 15, y_graph + 3, (char *)"ppm", txt_color, 1);
+
+// 		display.drawLine(display_width / 2 + 10, y_graph + h_bar, display_width / 2 + 10, y_graph, (uint16_t)txt_color);
+// 		display.drawLine(display_width / 2 + 5, y_graph + h_bar, display_width / 2 + 10, y_graph + h_bar, (uint16_t)txt_color);
+// 		display.drawLine(display_width / 2 + 5, y_graph, display_width / 2 + 10, y_graph, (uint16_t)txt_color);
+
+// 		// Draw CO2 values
+// 		for (int idx = 0; idx < num_values; idx++)
+// 		{
+// 			// if (co2_values[idx] != 0.0)
+// 			if (co2_values[idx] >= 200.0)
+// 			{
+// 				display.drawLine((int16_t)(x_graph + (idx * w_bar)),
+// 								 //  (int16_t)(y_graph + ((h_bar) - (co2_values[idx] / bar_divider))),
+// 								 (int16_t)(y_graph + ((h_bar) - ((co2_values[idx] - 200) / bar_divider))),
+// 								 (int16_t)(x_graph + (idx * w_bar)),
+// 								 (int16_t)(y_graph + h_bar),
+// 								 txt_color);
+// 			}
+// 		}
+// 		display.drawLine(x_graph, y_graph + h_bar, x_graph + display_width / 2, y_graph + h_bar, (uint16_t)txt_color);
+
+// 		// For partial update only
+// 		// MYLOG("EPD", "Updating x1 %d y1 %d x2 %d y2 %d", x_text, y_text, x_text + w_text, y_text + h_text);
+// 		// display.displayPartial(x_text, y_text, x_text + w_text, y_text + h_text);
+// 	}
+// }
+
+// /**
+//  * @brief Update display with particle matter values
+//  *
+//  * @param full unused
+//  */
+// void pm_rak14000(void)
+// {
+// 	x_text = display_width / 2 + 53;
+// 	y_text = display_height / 4;
+// 	s_text = 2;
+
+// 	// Write value
+// 	display.drawBitmap(x_text, y_text, pm_img, 32, 32, txt_color);
+
+// 	snprintf(disp_text, 29, "PM");
+// 	text_rak14000(x_text + 40, y_text + 20, disp_text, txt_color, s_text);
+
+// 	// PM 1.0 levels
+// 	if (pm10_values[pm_idx - 1] > 75)
+// 	{
+// 		snprintf(disp_text, 29, "1.0: !!");
+// 		if (g_air_status < 255)
+// 		{
+// 			g_air_status = 255;
+// 		}
+// 	}
+// 	else if (pm10_values[pm_idx - 1] > 35)
+// 	{
+// 		snprintf(disp_text, 29, "1.0: !");
+// 		if (g_air_status < 128)
+// 		{
+// 			g_air_status = 128;
+// 		}
+// 	}
+// 	else
+// 	{
+// 		snprintf(disp_text, 29, "1.0:");
+// 	}
+// 	text_rak14000(x_text, y_text + 60, disp_text, txt_color, s_text);
+
+// 	snprintf(disp_text, 29, "%d", pm10_values[pm_idx - 1]);
+// 	display.setFont(LARGE_FONT);
+// 	display.setTextSize(1);
+// 	display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
+// 	text_rak14000(display_width - txt_w - 45, y_text + 60, disp_text, txt_color, s_text);
+// 	snprintf(disp_text, 29, "%cg/m%c", 0x7F, 0x80);
+// 	text_rak14000(display_width - 38, y_text + 65, disp_text, txt_color, 1);
+
+// 	// PM 2.5 levels
+// 	if (pm25_values[pm_idx - 1] > 75)
+// 	{
+// 		snprintf(disp_text, 29, "2.5: !!");
+// 		if (g_air_status < 255)
+// 		{
+// 			g_air_status = 255;
+// 		}
+// 	}
+// 	else if (pm25_values[pm_idx - 1] > 35)
+// 	{
+// 		snprintf(disp_text, 29, "2.5: !");
+// 		if (g_air_status < 128)
+// 		{
+// 			g_air_status = 128;
+// 		}
+// 	}
+// 	else
+// 	{
+// 		snprintf(disp_text, 29, "2.5:");
+// 	}
+// 	text_rak14000(x_text, y_text + 120, disp_text, txt_color, s_text);
+
+// 	snprintf(disp_text, 29, "%d", pm25_values[pm_idx - 1]);
+// 	display.setFont(LARGE_FONT);
+// 	display.setTextSize(1);
+// 	display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
+// 	text_rak14000(display_width - txt_w - 45, y_text + 120, disp_text, txt_color, s_text);
+// 	snprintf(disp_text, 29, "%cg/m%c", 0x7F, 0x80);
+// 	text_rak14000(display_width - 38, y_text + 125, disp_text, txt_color, 1);
+
+// 	// PM 10 levels
+// 	if (pm100_values[pm_idx - 1] > 199)
+// 	{
+// 		snprintf(disp_text, 29, "10: !!");
+// 		if (g_air_status < 255)
+// 		{
+// 			g_air_status = 255;
+// 		}
+// 	}
+// 	else if (pm100_values[pm_idx - 1] > 150)
+// 	{
+// 		snprintf(disp_text, 29, "10: !");
+// 		if (g_air_status < 128)
+// 		{
+// 			g_air_status = 128;
+// 		}
+// 	}
+// 	else
+// 	{
+// 		snprintf(disp_text, 29, "10:");
+// 	}
+// 	text_rak14000(x_text, y_text + 180, disp_text, txt_color, s_text);
+
+// 	snprintf(disp_text, 29, "%d", pm100_values[pm_idx - 1]);
+// 	display.setFont(LARGE_FONT);
+// 	display.setTextSize(1);
+// 	display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
+// 	text_rak14000(display_width - txt_w - 45, y_text + 180, disp_text, txt_color, s_text);
+// 	snprintf(disp_text, 29, "%cg/m%c", 0x7F, 0x80);
+// 	text_rak14000(display_width - 38, y_text + 185, disp_text, txt_color, 1);
+// }
+
+// /**
+//  * @brief Update display for temperature values
+//  *
+//  * @param full unused
+//  */
+// void temp_rak14000(bool has_pm, bool has_baro)
+// {
+// 	x_text = 25;
+// 	if (has_baro)
+// 	{
+// 		y_text = display_height / 2 + 10;
+// 	}
+// 	else
+// 	{
+// 		y_text = display_height / 4 + 105;
+// 	}
+// 	s_text = 2;
+// 	spacer = 60;
+
+// 	// If PM sensor is not available, position is different
+// 	if (!has_pm)
+// 	{
+// 		x_text = display_width / 2 + 53;
+// 		y_text = 12;
+// 		s_text = 2;
+// 		spacer = 50;
+
+// 		// Write value
+// 		display.drawBitmap(display_width - (display_width / 4 - 16), y_text, celsius_img, 32, 32, txt_color);
+
+// 		snprintf(disp_text, 29, "~C");
+// 		display.setFont(SMALL_FONT);
+// 		display.setTextSize(1);
+// 		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
+
+// 		text_rak14000(display_width - txt_w - 3, y_text + spacer + 4, disp_text, (uint16_t)txt_color, 1);
+
+// 		snprintf(disp_text, 29, "%.2f ", temp_values[temp_idx - 1]);
+// 		display.setFont(LARGE_FONT);
+// 		display.setTextSize(1);
+// 		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w2, &txt_h);
+
+// 		text_rak14000(display_width - txt_w - txt_w2 - 6, y_text + spacer, disp_text, (uint16_t)txt_color, s_text);
+// 	}
+// 	else
+// 	{
+// 		// Write value
+// 		display.drawBitmap(x_text, y_text, celsius_img, 32, 32, txt_color);
+
+// 		snprintf(disp_text, 29, "%.2f", temp_values[temp_idx - 1]);
+
+// 		display.setFont(LARGE_FONT);
+// 		display.setTextSize(1);
+// 		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
+
+// 		text_rak14000(x_text + spacer, y_text + 16, disp_text, (uint16_t)txt_color, s_text);
+
+// 		snprintf(disp_text, 29, "~C");
+// 		text_rak14000(x_text + spacer + txt_w + 4, y_text + 16 + 4, disp_text, (uint16_t)txt_color, 1);
+// 	}
+// }
+
+// /**
+//  * @brief Update display for humidity values
+//  *
+//  * @param full unused
+//  */
+// void humid_rak14000(bool has_pm, bool has_baro)
+// {
+// 	x_text = 25;
+// 	if (has_baro)
+// 	{
+// 		y_text = display_height / 2 + (display_height / 2 / 3) + 10;
+// 	}
+// 	else
+// 	{
+// 		y_text = (display_height / 4) + 165;
+// 	}
+// 	s_text = 2;
+// 	spacer = 60;
+
+// 	// If PM sensor is not available, position is different
+// 	if (!has_pm)
+// 	{
+// 		x_text = display_width / 2 + 53;
+// 		y_text = display_height / 3 + 15;
+// 		s_text = 2;
+// 		spacer = 50;
+
+// 		// Write value
+// 		display.drawBitmap(display_width - (display_width / 4 - 16), y_text, humidity_img, 32, 32, txt_color);
+
+// 		snprintf(disp_text, 29, "%%RH");
+// 		display.setFont(SMALL_FONT);
+// 		display.setTextSize(1);
+// 		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
+
+// 		text_rak14000(display_width - txt_w - 3, y_text + spacer + 4, disp_text, (uint16_t)txt_color, 1);
+
+// 		snprintf(disp_text, 29, "%.2f ", humid_values[humid_idx - 1]);
+// 		display.setFont(LARGE_FONT);
+// 		display.setTextSize(1);
+// 		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w2, &txt_h);
+
+// 		text_rak14000(display_width - txt_w - txt_w2 - 6, y_text + spacer, disp_text, (uint16_t)txt_color, s_text);
+// 	}
+// 	else
+// 	{
+// 		// Write value
+// 		display.drawBitmap(x_text, y_text, humidity_img, 32, 32, txt_color);
+
+// 		snprintf(disp_text, 29, "%.2f", humid_values[humid_idx - 1]);
+
+// 		display.setFont(LARGE_FONT);
+// 		display.setTextSize(1);
+// 		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
+
+// 		text_rak14000(x_text + spacer, y_text + 16, disp_text, (uint16_t)txt_color, s_text);
+
+// 		snprintf(disp_text, 29, "%%RH");
+// 		text_rak14000(x_text + spacer + txt_w + 4, y_text + 16 + 4, disp_text, (uint16_t)txt_color, 1);
+// 	}
+// }
+
+// /**
+//  * @brief Update display for barometric pressure
+//  *
+//  * @param full unused
+//  */
+// void baro_rak14000(bool has_pm)
+// {
+// 	x_text = 25;
+// 	y_text = display_height / 2 + (display_height / 2 / 3 * 2) + 10;
+// 	s_text = 2;
+// 	spacer = 60;
+
+// 	// If PM sensor is not available, position is different
+// 	if (!has_pm)
+// 	{
+// 		x_text = display_width / 2 + 53;
+// 		y_text = display_height / 3 * 2 + 15;
+// 		s_text = 2;
+// 		spacer = 50;
+
+// 		// Write value
+// 		display.drawBitmap(display_width - (display_width / 4 - 16), y_text, barometer_img, 32, 32, txt_color);
+
+// 		snprintf(disp_text, 29, "mBar");
+// 		display.setFont(SMALL_FONT);
+// 		display.setTextSize(1);
+// 		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
+
+// 		text_rak14000(display_width - txt_w - 3, y_text + spacer + 4, disp_text, (uint16_t)txt_color, 1);
+
+// 		snprintf(disp_text, 29, "%.1f ", baro_values[baro_idx - 1]);
+// 		display.setFont(LARGE_FONT);
+// 		display.setTextSize(1);
+// 		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w2, &txt_h);
+
+// 		text_rak14000(display_width - txt_w - txt_w2 - 6, y_text + spacer, disp_text, (uint16_t)txt_color, s_text);
+// 	}
+// 	else
+// 	{
+// 		// Write value
+// 		display.drawBitmap(x_text, y_text, barometer_img, 32, 32, txt_color);
+
+// 		snprintf(disp_text, 29, "%.2f", baro_values[baro_idx - 1]);
+
+// 		display.setFont(LARGE_FONT);
+// 		display.setTextSize(1);
+// 		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
+
+// 		text_rak14000(x_text + spacer, y_text + 16, disp_text, (uint16_t)txt_color, s_text);
+
+// 		snprintf(disp_text, 29, "mBar");
+// 		text_rak14000(x_text + spacer + txt_w + 4, y_text + 16 + 4, disp_text, (uint16_t)txt_color, 1);
+// 	}
+// }
+
+void rak14000_start_screen(bool startup)
 {
 	// Clear display
 	display.clearBuffer();
 
 	// Draw Welcome Logo
-	display.fillRect(0, 0, DEPG_HP.width, DEPG_HP.height, bg_color);
-	display.drawBitmap(DEPG_HP.width / 2 - 75, 50, rak_img, 184, 56, txt_color); // 184x56
+	display.fillRect(0, 0, display_width, display_height, bg_color);
+	display.drawBitmap(display_width / 2 - 75, 50, rak_img, 184, 56, txt_color); // 184x56
 
 	display.setFont(SMALL_FONT);
 	display.setTextSize(1);
@@ -973,26 +1021,33 @@ void rak14000_start_screen(void)
 		read_rak12002();
 		snprintf(disp_text, 59, "%d/%d/%d %d:%d", g_date_time.date, g_date_time.month, g_date_time.year,
 				 g_date_time.hour, g_date_time.minute);
-		rak14000_text(0, 0, disp_text, (uint16_t)txt_color, 1);
+		text_rak14000(0, 0, disp_text, (uint16_t)txt_color, 1);
 	}
 
 	display.setFont(LARGE_FONT);
 	display.setTextSize(1);
 	display.getTextBounds((char *)"IoT Made Easy", 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-	rak14000_text(DEPG_HP.width / 2 - (txt_w / 2), 110, (char *)"IoT Made Easy", (uint16_t)txt_color, 2);
+	text_rak14000(display_width / 2 - (txt_w / 2), 110, (char *)"IoT Made Easy", (uint16_t)txt_color, 2);
 
 	display.setFont(LARGE_FONT);
 	display.setTextSize(1);
 	display.getTextBounds((char *)"RAK10702 Air Quality", 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-	rak14000_text(DEPG_HP.width / 2 - (txt_w / 2), 150, (char *)"RAK10702 Air Quality", (uint16_t)txt_color, 2);
+	text_rak14000(display_width / 2 - (txt_w / 2), 150, (char *)"RAK10702 Air Quality", (uint16_t)txt_color, 2);
 
-	display.drawBitmap(DEPG_HP.width / 2 - 63, 190, built_img, 126, 66, txt_color);
+	display.drawBitmap(display_width / 2 - 63, 190, built_img, 126, 66, txt_color);
 
 	display.setFont(SMALL_FONT);
 	display.setTextSize(1);
-	display.getTextBounds((char *)"Wait for connect", 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-	rak14000_text(DEPG_HP.width / 2 - (txt_w / 2), 260, (char *)"Wait for connect", (uint16_t)txt_color, 1);
-
+	if (startup)
+	{
+		display.getTextBounds((char *)"Wait for connect", 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
+		text_rak14000(display_width / 2 - (txt_w / 2), 260, (char *)"Wait for connect", (uint16_t)txt_color, 1);
+	}
+	else
+	{
+		display.getTextBounds((char *)"Restart", 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
+		text_rak14000(display_width / 2 - (txt_w / 2), 260, (char *)"Restart", (uint16_t)txt_color, 1);
+	}
 	display.display(false);
 }
 
@@ -1002,6 +1057,7 @@ void rak14000_switch_bg(void)
 	txt_color = bg_color;
 	bg_color = old_txt;
 	xSemaphoreGive(g_epd_sem);
+	delay(4000);
 }
 
 /**
@@ -1019,40 +1075,6 @@ void epd_task(void *pvParameters)
 	MYLOG("EPD", "Rotation %d", display.getRotation());
 
 	rak14000_start_screen();
-	// // Clear display
-	// display.clearBuffer();
-
-	// // Draw Welcome Logo
-	// display.fillRect(0, 0, DEPG_HP.width, DEPG_HP.height, bg_color);
-	// display.drawBitmap(DEPG_HP.width / 2 - 75, 50, rak_img, 184, 56, txt_color); // 184x56
-
-	// // If RTC is available, write the date
-	// if (found_sensors[RTC_ID].found_sensor)
-	// {
-	// 	read_rak12002();
-	// 	snprintf(disp_text, 59, "%d/%d/%d %d:%d", g_date_time.date, g_date_time.month, g_date_time.year,
-	// 			 g_date_time.hour, g_date_time.minute);
-	// 	rak14000_text(0, 0, disp_text, (uint16_t)txt_color, 2);
-	// }
-
-	// display.setFont(LARGE_FONT);
-	// display.setTextSize(1);
-	// display.getTextBounds((char *)"IoT Made Easy", 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-	// rak14000_text(DEPG_HP.width / 2 - (txt_w / 2), 110, (char *)"IoT Made Easy", (uint16_t)txt_color, 2);
-
-	// display.setFont(LARGE_FONT);
-	// display.setTextSize(1);
-	// display.getTextBounds((char *)"RAK10702 Air Quality", 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-	// rak14000_text(DEPG_HP.width / 2 - (txt_w / 2), 150, (char *)"RAK10702 Air Quality", (uint16_t)txt_color, 2);
-
-	// display.drawBitmap(DEPG_HP.width / 2 - 63, 190, built_img, 126, 66, txt_color);
-
-	// display.setFont(SMALL_FONT);
-	// display.setTextSize(1);
-	// display.getTextBounds((char *)"Wait for connect", 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-	// rak14000_text(DEPG_HP.width / 2 - (txt_w / 2), 260, (char *)"Wait for connect", (uint16_t)txt_color, 1);
-
-	// display.display(false);
 
 	// For partial update only
 	// uint16_t counter = 0;
@@ -1086,18 +1108,47 @@ void epd_task(void *pvParameters)
 
 		if (xSemaphoreTake(g_epd_sem, portMAX_DELAY) == pdTRUE)
 		{
-			// if (g_button_single)
-			// {
-			// 	status_rak14000();
-			// 	delay(1000);
-			// }
-			// else 
 			if (!g_is_unoccupied)
 			{
+				if (g_epd_off)
+				{
+					MYLOG("EPD", "EPD was off");
+					startup_rak14000();
+				}
+
 				refresh_rak14000();
-				delay(1000);
+
+				// Start timer to shut down EPD after 5 seconds (give time to refresh full screen)
+				display_off.start();
+			}
+			else
+			{
+				MYLOG("EPD", "Room is unoccupied");
 			}
 		}
 	}
 }
-#endif
+
+/**
+ * @brief Wake up RAK14000 from sleep
+ *
+ */
+void startup_rak14000(void)
+{
+	digitalWrite(EPD_POWER, HIGH);
+	g_epd_off = false;
+	delay(250);
+	// display.begin();
+	display.setRotation(EPD_ROTATION); // 1 for Gavin 3 for mine
+}
+
+/**
+ * @brief Put the RAK14000 into sleep mode
+ *
+ */
+void shut_down_rak14000(TimerHandle_t unused)
+{
+	// Disable power
+	digitalWrite(EPD_POWER, LOW);
+	g_epd_off = true;
+}

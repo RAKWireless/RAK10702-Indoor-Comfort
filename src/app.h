@@ -81,7 +81,7 @@ union batt_s
 	uint8_t batt8[2];
 };
 
-extern bool battery_check_enabled;
+extern bool g_is_using_battery;
 
 /** RTC date/time structure */
 struct date_time_s

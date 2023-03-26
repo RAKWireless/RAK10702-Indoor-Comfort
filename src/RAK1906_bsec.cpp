@@ -77,8 +77,6 @@ void bsec_read_wakeup(TimerHandle_t unused)
  */
 bool init_rak1906_bsec(void)
 {
-	Wire.begin();
-
 	iaqSensor.begin(BME680_I2C_ADDR_PRIMARY, Wire);
 
 	MYLOG("BSEC", "BSEC library version %d.%d.%d.%d",

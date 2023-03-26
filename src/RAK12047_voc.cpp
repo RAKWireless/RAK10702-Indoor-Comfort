@@ -43,6 +43,7 @@ uint16_t discard_counter = 0;
  */
 void voc_read_wakeup(TimerHandle_t unused)
 {
+	MYLOG("VOC", "VOC triggered");
 	api_wake_loop(VOC_REQ);
 }
 
@@ -112,7 +113,7 @@ bool init_rak12047(void)
 	discard_counter = 0;
 
 	// Set VOC reading interval to 10 seconds
-	voc_read_timer.begin(10000, voc_read_wakeup, NULL, true);
+	voc_read_timer.begin(sampling_interval * 1000, voc_read_wakeup, NULL, true);
 	voc_read_timer.start();
 	return true;
 }
@@ -159,6 +160,14 @@ void do_read_rak12047(void)
 	uint16_t defaultT = 0x6666;
 	float t_h_values[3] = {0.0}; // temperature [0] & humidity [1] value from T&H sensor
 
+	// /// \todo temporary solution requires to switch on/off power of the sensors
+	// if (g_sensors_off)
+	// {
+	// 	MYLOG("VOC", "Sensors are off, switching power on");
+	// 	digitalWrite(CO2_PM_POWER, HIGH); // power on RAK12037 & RAK12039
+	// 	delay(500);
+	// }
+
 	if (found_sensors[TEMP_ID].found_sensor)
 	{
 		get_rak1901_values(t_h_values);
@@ -190,6 +199,13 @@ void do_read_rak12047(void)
 	error = sgp40.measureRawSignal(defaultRh, defaultT,
 								   srawVoc);
 	MYLOG("VOC", "srawVoc: %d", srawVoc);
+
+	// /// \todo temporary solution requires to switch on/off power of the sensors
+	// if (g_sensors_off)
+	// {
+	// 	MYLOG("VOC", "Sensors are off, switching power off");
+	// 	digitalWrite(CO2_PM_POWER, LOW); // power off RAK12037 & RAK12039
+	// } 
 
 	// 3. Process raw signals by Gas Index Algorithm to get the VOC index values
 	if (error)

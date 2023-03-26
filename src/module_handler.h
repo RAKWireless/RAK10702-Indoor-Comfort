@@ -13,22 +13,23 @@
 #ifndef MODULE_HANDLER_H
 #define MODULE_HANDLER_H
 
-#ifdef NRF52_SERIES
 extern SoftwareTimer delayed_sending;
 void send_delayed(TimerHandle_t unused);
-#endif
+void switch_rgb_off(TimerHandle_t unused);
 
 /** Wakeup triggers for application events */
-#define MOTION_TRIGGER   0b1000000000000000
+#define MOTION_TRIGGER 0b1000000000000000
 #define N_MOTION_TRIGGER 0b0111111111111111
-#define GNSS_FIN         0b0100000000000000
-#define N_GNSS_FIN       0b1011111111111111
-#define VOC_REQ          0b0010000000000000
-#define N_VOC_REQ        0b1101111111111111
-#define ROOM_EMPTY       0b0001000000000000
-#define N_ROOM_EMPTY     0b1110111111111111
-#define BSEC_REQ         0b0000001000000000
-#define N_BSEC_REQ       0b1111110111111111
+#define SEND_NOW 0b0100000000000000
+#define N_SEND_NOW 0b1011111111111111
+#define VOC_REQ 0b0010000000000000
+#define N_VOC_REQ 0b1101111111111111
+#define ROOM_EMPTY 0b0001000000000000
+#define N_ROOM_EMPTY 0b1110111111111111
+#define LED_REQ 0b0000100000000000
+#define N_LED_REQ 0b1111011111111111
+#define BSEC_REQ 0b0000010000000000
+#define N_BSEC_REQ 0b1111101111111111
 
 typedef struct sensors_s
 {
@@ -122,7 +123,6 @@ bool init_rak1901(void);
 void read_rak1901(void);
 void get_rak1901_values(float *values);
 bool init_rak1902(void);
-void start_rak1902(void);
 void read_rak1902(void);
 float get_rak1902(void);
 bool init_rak1903(void);
@@ -139,10 +139,6 @@ bool read_rak1906_bsec(void);
 void get_rak1906_bsec_values(float *values);
 bool do_read_rak1906_bsec(void);
 #endif
-bool init_rak1921(void);
-void rak1921_add_line(char *line);
-void rak1921_show(void);
-void rak1921_write_header(char *header_line);
 bool init_rak12002(void);
 void set_rak12002(uint16_t year, uint8_t month, uint8_t date, uint8_t hour, uint8_t minute);
 void read_rak12002(void);
@@ -175,15 +171,37 @@ void set_baro_rak14000(float baro_value);
 void set_co2_rak14000(float co2_value);
 void set_pm_rak14000(uint16_t pm10_env, uint16_t pm25_env, uint16_t pm100_env);
 void voc_rak14000(void);
-void temp_rak14000(bool has_pm);
-void humid_rak14000(bool has_pm);
+void temp_rak14000(bool has_pm, bool has_baro);
+void humid_rak14000(bool has_pm, bool has_baro);
 void baro_rak14000(bool has_pm);
 void co2_rak14000(bool has_pm);
 void pm_rak14000(void);
 void status_general_rak14000(bool has_pm);
 void status_rak14000(void);
-void rak14000_start_screen(void);
+void rak14000_start_screen(bool startup = true);
 void rak14000_switch_bg(void);
+void startup_rak14000(void);
+void switch_ui(void);
+extern bool g_epd_off;
+
+// Sensor power functions
+void power_modules(bool switch_on);
+void start_up_rak1901(void);
+void shut_down_rak1901(void);
+void startup_rak1902(void);
+void shut_down_rak1902(void);
+void startup_rak1903(void);
+void shut_down_rak1903(void);
+void startup_rak12010(void);
+void shut_down_rak12010(void);
+void startup_rak12019(void);
+void shut_down_rak12019(void);
+void startup_rak12037(void);
+void shut_down_rak12037(void);
+void startup_rak12039(void);
+void shut_down_rak12039(void);
+void startup_rak14000(void);
+void shut_down_rak14000(TimerHandle_t unused);
 
 // RGB stuff
 void init_rgb(void);
@@ -194,26 +212,25 @@ extern bool g_status_changed;
 // PIR stuff
 void init_pir(void);
 extern bool g_occupied;
-#define PIR_INT WB_I2C2_SCL
+#define PIR_INT 25 // WB_I2C2_SCL
 
 // Button stuff
 void init_button(void);
 void check_button(void);
-#define BUTTON_INT WB_I2C2_SDA
+#define BUTTON_INT 24 // WB_I2C2_SDA
 
 #ifndef TASK_PRIO_LOW
 #define TASK_PRIO_LOW 1
 #endif
 
-	void
-	read_batt_settings(void);
+void read_batt_settings(void);
 void save_batt_settings(bool check_batt_enables);
 
-#define VOC_POWER PIN_SERIAL2_TX
-#define PIR_POWER PIN_AREF
-#define CO2_POWER PIN_A2
-#define PM_EPD_POWER WB_IO2
-
+#define VOC_POWER 20	// PIN_SERIAL2_TX
+#define PIR_POWER 2		// PIN_AREF
+#define CO2_PM_POWER 28 // PIN_A2
+#define EPD_POWER 34	// WB_IO2
+extern bool g_sensors_off;
 /** Latitude/Longitude value union */
 union latLong_s
 {

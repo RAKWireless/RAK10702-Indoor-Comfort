@@ -15,11 +15,11 @@
 /** Timer for delayed sending to keep duty cycle */
 SoftwareTimer delayed_sending;
 
+/** Timer to switch off LED 15 seconds after sending */
+SoftwareTimer rgb_off;
+
 /** Flag if delayed sending is already activated */
 bool delayed_active = false;
-
-/** Flag for battery protection enabled */
-bool battery_check_enabled = false;
 
 /** Set the device name, max length is 10 characters */
 char g_ble_dev_name[10] = "RAK";
@@ -27,15 +27,14 @@ char g_ble_dev_name[10] = "RAK";
 /** Send Fail counter **/
 uint8_t join_send_fail = 0;
 
-/** Flag for low battery protection */
-bool low_batt_protection = false;
-
 /** LoRaWAN packet */
 WisCayenne g_solution_data(255);
 
 uint8_t unoccupied_counter = 0;
 
 bool g_is_unoccupied = false;
+
+bool g_is_using_battery = false;
 
 char disp_txt[64] = {0};
 
@@ -64,22 +63,16 @@ void setup_app(void)
 	}
 
 	// Enable PM and EPD power
-	pinMode(PM_EPD_POWER, OUTPUT);
-	digitalWrite(PM_EPD_POWER, HIGH);
+	pinMode(EPD_POWER, OUTPUT);
+	digitalWrite(EPD_POWER, HIGH);
 
-	// CO2 POWER
-	pinMode(CO2_POWER, OUTPUT);
-	digitalWrite(CO2_POWER, HIGH);
+	// CO2 & PM POWER
+	pinMode(CO2_PM_POWER, OUTPUT);
+	digitalWrite(CO2_PM_POWER, HIGH);
 
 	// VOC POWER
 	pinMode(VOC_POWER, OUTPUT);
 	digitalWrite(VOC_POWER, HIGH);
-
-	// Init PIR
-	init_pir();
-
-	// BUTTON
-	init_button();
 
 #if HAS_EPD > 0
 	MYLOG("APP", "Init RAK14000");
@@ -90,20 +83,17 @@ void setup_app(void)
 	// Scan the I2C interfaces for devices
 	find_modules();
 
+	// Initialize RGB LED
+	init_rgb();
+
 	// Initialize the User AT command list
 	init_user_at();
 
-	init_rgb();
+	// Check if device is running from battery
+	g_is_using_battery = read_batt() < 1.0 ? false : true;
 
-#if defined NRF52_SERIES || defined ESP32
-#ifdef BLE_OFF
-	// Enable BLE
-	g_enable_ble = false;
-#else
 	// Enable BLE
 	g_enable_ble = true;
-#endif
-#endif
 }
 
 /**
@@ -117,9 +107,6 @@ bool init_app(void)
 	MYLOG("APP", "init_app");
 
 	api_set_version(SW_VERSION_1, SW_VERSION_2, SW_VERSION_3);
-
-	// Get the battery check setting
-	read_batt_settings();
 
 	AT_PRINTF("============================");
 	AT_PRINTF("Air Quality Sensor");
@@ -138,21 +125,28 @@ bool init_app(void)
 	// Reset the packet
 	g_solution_data.reset();
 
-	if (found_sensors[OLED_ID].found_sensor)
-	{
-		if (found_sensors[RTC_ID].found_sensor)
-		{
-			read_rak12002();
-			snprintf(disp_txt, 64, "%d:%02d Init finished", g_date_time.hour, g_date_time.minute);
-		}
-		else
-		{
-			snprintf(disp_txt, 64, "Init finished");
-		}
-		rak1921_add_line(disp_txt);
-	}
+	// Init PIR
+	init_pir();
+
+	// BUTTON
+	init_button();
 
 	set_rgb_color(255, 255, 0);
+
+	// If on battery usage, start timer to
+	if (g_is_using_battery)
+	{
+		MYLOG("APP", "Device is battery powered!");
+		rgb_off.begin(15000, switch_rgb_off, NULL, false);
+	}
+
+	// Prepare timer to send after the sensors were awake for 30 seconds
+	delayed_sending.begin(30000, send_delayed, NULL, false);
+
+	if (!g_lorawan_settings.lorawan_enable)
+	{
+		api_wake_loop(STATUS);
+	}
 	return true;
 }
 
@@ -163,6 +157,14 @@ bool init_app(void)
  */
 void app_event_handler(void)
 {
+	// Toggle RGB visibility
+	if ((g_task_event_type & LED_REQ) == LED_REQ)
+	{
+		g_task_event_type &= N_LED_REQ;
+		MYLOG("APP", "RGB off after 15 seconds");
+		set_rgb_color(0, 0, 0);
+	}
+
 	// Unoccupied event
 	if ((g_task_event_type & ROOM_EMPTY) == ROOM_EMPTY)
 	{
@@ -192,135 +194,64 @@ void app_event_handler(void)
 		{
 			set_rgb_color(128, 0, 0);
 		}
+		if (g_is_using_battery)
+		{
+			MYLOG("APP", "On battery, switch off the RGB after 15 seconds");
+			rgb_off.start();
+		}
+	}
+
+	if ((g_task_event_type & STATUS) == STATUS)
+	{
+		MYLOG("APP", "Wake-up, power up sensors");
+		g_task_event_type &= N_STATUS;
+		delayed_sending.start();
 	}
 
 	// Timer triggered event
-	if ((g_task_event_type & STATUS) == STATUS)
+	if ((g_task_event_type & SEND_NOW) == SEND_NOW)
 	{
+		g_task_event_type &= N_SEND_NOW;
+		MYLOG("APP", "Start reading and sending");
 
-		g_task_event_type &= N_STATUS;
-		MYLOG("APP", "Timer wakeup");
-
-#if USE_BSEC == 0
-		/*********************************************/
-		/** Select between Bosch BSEC algorithm for  */
-		/** IAQ index or simple T/H/P readings       */
-		/*********************************************/
-		if (found_sensors[ENV_ID].found_sensor) // Using simple T/H/P readings
-		{
-			// Startup the BME680
-			start_rak1906();
-		}
-#endif
-		if (found_sensors[PRESS_ID].found_sensor)
-		{
-			// Startup the LPS22HB
-			start_rak1902();
-		}
-
-#if defined NRF52_SERIES || defined ESP32
 		// If BLE is enabled, restart Advertising
 		if (g_enable_ble)
 		{
 			restart_advertising(15);
 		}
-#endif
 
 		// Reset the packet
 		g_solution_data.reset();
 
-		if (!low_batt_protection)
-		{
-			MYLOG("APP", "Start reading the sensors");
-			// Get values from the connected modules
-			get_sensor_values();
-		}
+		// Get values from the connected modules
+		get_sensor_values();
 
 		// Get battery level
 		float batt_level_f = read_batt();
 		g_solution_data.addVoltage(LPP_CHANNEL_BATT, batt_level_f / 1000.0);
 
-		if (found_sensors[OLED_ID].found_sensor)
-		{
-			if (found_sensors[RTC_ID].found_sensor)
-			{
-				read_rak12002();
-				snprintf(disp_txt, 64, "%d:%02d Bat %.3fV", g_date_time.hour, g_date_time.minute, batt_level_f / 1000);
-			}
-			else
-			{
-				snprintf(disp_txt, 64, "Battery %.3fV", batt_level_f / 1000);
-			}
-			rak1921_add_line(disp_txt);
-		}
-
-		// Protection against battery drain if battery check is enabled
-		if (battery_check_enabled)
-		{
-			if (batt_level_f < 2900)
-			{
-				// Battery is very low, change send time to 1 hour to protect battery
-				low_batt_protection = true; // Set low_batt_protection active
-				api_timer_restart(1 * 60 * 60 * 1000);
-				MYLOG("APP", "Battery protection activated");
-			}
-			else if ((batt_level_f > 4100) && low_batt_protection)
-			{
-				// Battery is higher than 4V, change send time back to original setting
-				low_batt_protection = false;
-				api_timer_restart(g_lorawan_settings.send_repeat_time);
-				MYLOG("APP", "Battery protection deactivated");
-			}
-		}
-
-		// Get data from the slower sensors
-#if USE_BSEC == 0
-		/*********************************************/
-		/** Select between Bosch BSEC algorithm for  */
-		/** IAQ index or simple T/H/P readings       */
-		/*********************************************/
-		if (found_sensors[ENV_ID].found_sensor) // Using simple T/H/P readings
-		{
-			// Read environment data
-			read_rak1906();
-		}
-#endif
-		if (found_sensors[PRESS_ID].found_sensor)
-		{
-			// Read environment data
-			read_rak1902();
-		}
-
 		MYLOG("APP", "Packetsize %d", g_solution_data.getSize());
+		bool refresh_without_send = true;
 		if (g_lorawan_settings.lorawan_enable)
 		{
-			lmh_error_status result = send_lora_packet(g_solution_data.getBuffer(), g_solution_data.getSize());
-			switch (result)
+			if (g_lpwan_has_joined)
 			{
-			case LMH_SUCCESS:
-				if (found_sensors[OLED_ID].found_sensor)
+				lmh_error_status result = send_lora_packet(g_solution_data.getBuffer(), g_solution_data.getSize());
+				switch (result)
 				{
-					if (found_sensors[RTC_ID].found_sensor)
-					{
-						read_rak12002();
-						snprintf(disp_txt, 64, "%d:%02d Pkg %d b", g_date_time.hour, g_date_time.minute, g_solution_data.getSize());
-					}
-					else
-					{
-						snprintf(disp_txt, 64, "Packet sent %d b", g_solution_data.getSize());
-					}
-					rak1921_add_line(disp_txt);
+				case LMH_SUCCESS:
+					MYLOG("APP", "Packet enqueued");
+					refresh_without_send = false;
+					break;
+				case LMH_BUSY:
+					MYLOG("APP", "LoRa transceiver is busy");
+					AT_PRINTF("+EVT:BUSY\n");
+					break;
+				case LMH_ERROR:
+					AT_PRINTF("+EVT:SIZE_ERROR\n");
+					MYLOG("APP", "Packet error, too big to send with current DR");
+					break;
 				}
-				MYLOG("APP", "Packet enqueued");
-				break;
-			case LMH_BUSY:
-				MYLOG("APP", "LoRa transceiver is busy");
-				AT_PRINTF("+EVT:BUSY\n");
-				break;
-			case LMH_ERROR:
-				AT_PRINTF("+EVT:SIZE_ERROR\n");
-				MYLOG("APP", "Packet error, too big to send with current DR");
-				break;
 			}
 		}
 		else
@@ -332,20 +263,8 @@ void app_event_handler(void)
 			// Send packet over LoRa
 			if (send_p2p_packet(packet_buffer, g_solution_data.getSize() + 8))
 			{
-				if (found_sensors[OLED_ID].found_sensor)
-				{
-					if (found_sensors[RTC_ID].found_sensor)
-					{
-						read_rak12002();
-						snprintf(disp_txt, 64, "%d:%02d Pkg %d b", g_date_time.hour, g_date_time.minute, g_solution_data.getSize());
-					}
-					else
-					{
-						snprintf(disp_txt, 64, "Packet sent %d b", g_solution_data.getSize());
-					}
-					rak1921_add_line(disp_txt);
-				}
 				MYLOG("APP", "Packet enqueued");
+				refresh_without_send = false;
 			}
 			else
 			{
@@ -355,6 +274,15 @@ void app_event_handler(void)
 		}
 		// Reset the packet
 		g_solution_data.reset();
+
+#if HAS_EPD > 0
+		if (refresh_without_send)
+		{
+			// Refresh display
+			MYLOG("APP", "Refresh RAK14000");
+			wake_rak14000();
+		}
+#endif
 	}
 
 	// VOC read request event
@@ -380,8 +308,6 @@ void app_event_handler(void)
 	}
 }
 
-// ESP32 is handling the received BLE UART data different, this works only for nRF52
-#if defined NRF52_SERIES
 /**
  * @brief Handle BLE UART data
  *
@@ -406,7 +332,6 @@ void ble_data_handler(void)
 		}
 	}
 }
-#endif
 
 /**
  * @brief Handle received LoRa Data
@@ -421,34 +346,11 @@ void lora_data_handler(void)
 		g_task_event_type &= N_LORA_JOIN_FIN;
 		if (g_join_result)
 		{
-			if (found_sensors[OLED_ID].found_sensor)
-			{
-				if (found_sensors[RTC_ID].found_sensor)
-				{
-					read_rak12002();
-					snprintf(disp_txt, 64, "%d:%02d Join success", g_date_time.hour, g_date_time.minute);
-				}
-				else
-				{
-					snprintf(disp_txt, 64, "Join success");
-				}
-				rak1921_add_line(disp_txt);
-			}
 			MYLOG("APP", "Successfully joined network");
 			AT_PRINTF("+EVT:JOINED\n");
 
 			// Reset join failed counter
 			join_send_fail = 0;
-
-			// // Force a sensor reading in 2 seconds
-#ifdef NRF52_SERIES
-			delayed_sending.setPeriod(2000);
-			delayed_sending.start();
-#endif
-#ifdef ESP32
-			delayed_sending.attach_ms(2000, send_delayed);
-
-#endif
 		}
 		else
 		{
@@ -457,13 +359,11 @@ void lora_data_handler(void)
 			/// \todo here join could be restarted.
 			lmh_join();
 
-#if defined NRF52_SERIES || defined ESP32
 			// If BLE is enabled, restart Advertising
 			if (g_enable_ble)
 			{
 				restart_advertising(15);
 			}
-#endif
 
 			join_send_fail++;
 			if (join_send_fail == 10)
@@ -472,6 +372,12 @@ void lora_data_handler(void)
 				delay(100);
 				api_reset();
 			}
+		}
+		if (join_send_fail < 2)
+		{
+			// Force a sensor reading
+			// Force a sensor reading
+			api_wake_loop(STATUS);
 		}
 	}
 
@@ -484,7 +390,6 @@ void lora_data_handler(void)
 		// Refresh display
 		MYLOG("APP", "Refresh RAK14000");
 		wake_rak14000();
-		// refresh_rak14000();
 #endif
 		MYLOG("APP", "LoRa TX cycle %s", g_rx_fin_result ? "finished ACK" : "failed NAK");
 
@@ -497,6 +402,11 @@ void lora_data_handler(void)
 			AT_PRINTF("+EVT:SEND OK\n");
 		}
 
+		if (g_is_using_battery)
+		{
+			MYLOG("APP", "On battery, switch off the RGB after 15 seconds");
+			rgb_off.start();
+		}
 		if (!g_rx_fin_result)
 		{
 			// Increase fail send counter
@@ -543,14 +453,6 @@ void lora_data_handler(void)
 
 		if (g_lorawan_settings.lorawan_enable)
 		{
-			// AT_PRINTF("+EVT:RX_1, RSSI %d, SNR %d\n", g_last_rssi, g_last_snr);
-			// AT_PRINTF("+EVT:%d:", g_last_fport);
-			// for (int idx = 0; idx < g_rx_data_len; idx++)
-			// {
-			// 	AT_PRINTF("%02X", g_rx_lora_data[idx]);
-			// }
-			// AT_PRINTF("\n");
-
 			char rx_msg[512] = {0};
 			int len = sprintf(rx_msg, "+EVT:RX_1:%d:%d:UNICAST:%d:", g_last_rssi, g_last_snr, g_last_fport);
 			for (int idx = 0; idx < g_rx_data_len; idx++)
@@ -562,13 +464,6 @@ void lora_data_handler(void)
 		}
 		else
 		{
-			// AT_PRINTF("+EVT:RXP2P, RSSI %d, SNR %d\n", g_last_rssi, g_last_snr);
-			// AT_PRINTF("+EVT:");
-			// for (int idx = 0; idx < g_rx_data_len; idx++)
-			// {
-			// 	AT_PRINTF("%02X", g_rx_lora_data[idx]);
-			// }
-			// AT_PRINTF("\n");
 			char rx_msg[512] = {0};
 			int len = sprintf(rx_msg, "+EVT:RXP2P:%d:%d:", g_last_rssi, g_last_snr);
 			for (int idx = 0; idx < g_rx_data_len; idx++)
@@ -590,6 +485,16 @@ void lora_data_handler(void)
  */
 void send_delayed(TimerHandle_t unused)
 {
-	api_wake_loop(STATUS);
+	api_wake_loop(SEND_NOW);
 	delayed_sending.stop();
+}
+
+/**
+ * @brief Toggle RGB Visibility
+ *
+ * @param unused
+ */
+void switch_rgb_off(TimerHandle_t unused)
+{
+	api_wake_loop(LED_REQ);
 }

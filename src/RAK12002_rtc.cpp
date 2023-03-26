@@ -24,7 +24,6 @@ date_time_s g_date_time;
  */
 bool init_rak12002(void)
 {
-	Wire.begin();
 	rtc.initI2C(Wire);
 
 	rtc.useEEPROM(false);

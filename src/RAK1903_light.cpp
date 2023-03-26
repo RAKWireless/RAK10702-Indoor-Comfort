@@ -24,7 +24,6 @@ ClosedCube_OPT3001 opt3001;
  */
 bool init_rak1903(void)
 {
-	Wire.begin();
 	if (opt3001.begin(OPT3001_ADDRESS) != NO_ERROR)
 	{
 		MYLOG("LIGHT", "Could not initialize SHTC3");
@@ -70,4 +69,22 @@ void read_rak1903()
 		MYLOG("LIGHT", "Error reading OPT3001");
 		g_solution_data.addLuminosity(LPP_CHANNEL_LIGHT, 0);
 	}
+}
+
+/**
+ * @brief Wake up RAK1903 from sleep
+ *
+ */
+void startup_rak1903(void)
+{
+	// No low power functionality found
+}
+
+/**
+ * @brief Put the RAK1903 into sleep mode
+ *
+ */
+void shut_down_rak1903(void)
+{
+	// No low power functionality found
 }
