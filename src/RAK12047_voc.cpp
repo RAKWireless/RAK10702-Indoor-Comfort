@@ -160,14 +160,6 @@ void do_read_rak12047(void)
 	uint16_t defaultT = 0x6666;
 	float t_h_values[3] = {0.0}; // temperature [0] & humidity [1] value from T&H sensor
 
-	// /// \todo temporary solution requires to switch on/off power of the sensors
-	// if (g_sensors_off)
-	// {
-	// 	MYLOG("VOC", "Sensors are off, switching power on");
-	// 	digitalWrite(CO2_PM_POWER, HIGH); // power on RAK12037 & RAK12039
-	// 	delay(500);
-	// }
-
 	if (found_sensors[TEMP_ID].found_sensor)
 	{
 		get_rak1901_values(t_h_values);
@@ -195,17 +187,35 @@ void do_read_rak12047(void)
 		}
 	}
 
+	// /// \todo temporary solution requires to switch on/off power of the sensors
+	// if (g_epd_off)
+	// {
+	// 	MYLOG("VOC", "EPD is off, switching power on");
+	// 	digitalWrite(EPD_POWER, HIGH);
+	// }
+	// if (g_sensors_off)
+	// {
+	// 	MYLOG("VOC", "Sensors are off, switching power on");
+	// 	digitalWrite(CO2_PM_POWER, HIGH); // power on RAK12037 & RAK12039
+	// 	delay(500);
+	// }
+
 	// 2. Measure SGP4x signals
 	error = sgp40.measureRawSignal(defaultRh, defaultT,
 								   srawVoc);
 	MYLOG("VOC", "srawVoc: %d", srawVoc);
 
 	// /// \todo temporary solution requires to switch on/off power of the sensors
+	// if (g_epd_off)
+	// {
+	// 	MYLOG("VOC", "EPD is off, switching power off");
+	// 	digitalWrite(EPD_POWER, LOW);
+	// }
 	// if (g_sensors_off)
 	// {
 	// 	MYLOG("VOC", "Sensors are off, switching power off");
 	// 	digitalWrite(CO2_PM_POWER, LOW); // power off RAK12037 & RAK12039
-	// } 
+	// }
 
 	// 3. Process raw signals by Gas Index Algorithm to get the VOC index values
 	if (error)

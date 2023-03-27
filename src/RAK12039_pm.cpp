@@ -23,7 +23,6 @@ PMSA_Data_t data;
  *        Set pin/TTL level @3.3V, high level or suspending is normal working status.
  *        while low level is sleeping mode.
  */
-#define SET_PIN WB_IO6
 
 /**
  * @brief Initialize the PMSA003I sensor
@@ -100,7 +99,7 @@ void read_rak12039(void)
 void startup_rak12039(void)
 {
 	// Sensor on
-	digitalWrite(CO2_PM_POWER, HIGH); // power on RAK12039
+	// digitalWrite(CO2_PM_POWER, HIGH); // power on RAK12039
 	digitalWrite(SET_PIN, HIGH);
 	// Wait for wakeup
 	time_t wait_sensor = millis();
@@ -123,7 +122,7 @@ void startup_rak12039(void)
 		}
 	}
 
-	init_rak12039();
+	// init_rak12039();
 }
 
 /**

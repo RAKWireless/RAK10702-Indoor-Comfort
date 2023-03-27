@@ -160,4 +160,8 @@ extern GFXfont RAK_EPD_20pt;
 #define EPD_RESET -1 // not use
 #define EPD_BUSY WB_IO4
 
+#define RGB_BLUE 0,0,255
+#define RGB_YELLOW 255,234,0
+#define RGB_RED 255,0,0
+
 #endif // _RAK14000_EPD_H_

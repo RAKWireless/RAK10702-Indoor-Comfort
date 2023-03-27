@@ -230,6 +230,8 @@ void save_batt_settings(bool check_batt_enables);
 #define PIR_POWER 2		// PIN_AREF
 #define CO2_PM_POWER 28 // PIN_A2
 #define EPD_POWER 34	// WB_IO2
+#define SET_PIN WB_IO6
+
 extern bool g_sensors_off;
 /** Latitude/Longitude value union */
 union latLong_s

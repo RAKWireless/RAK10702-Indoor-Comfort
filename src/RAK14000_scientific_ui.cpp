@@ -27,13 +27,23 @@ void scientific_rak14000(void)
 	{
 		has_baro = true;
 	}
-	voc_rak14000();
-	co2_rak14000(has_pm);
+	if (found_sensors[VOC_ID].found_sensor)
+	{
+		voc_rak14000();
+	}
+	if (found_sensors[CO2_ID].found_sensor)
+	{
+		co2_rak14000(has_pm);
+	}
 	temp_rak14000(has_pm, has_baro);
 	humid_rak14000(has_pm, has_baro);
 	if (has_baro)
 	{
 		baro_rak14000(has_pm);
+	}
+	if (found_sensors[PM_ID].found_sensor)
+	{
+		pm_rak14000();
 	}
 
 	if (old_air_status != g_air_status)
@@ -42,15 +52,15 @@ void scientific_rak14000(void)
 	}
 	if (g_air_status == 0)
 	{
-		set_rgb_color(0, 0, 255);
+		set_rgb_color(RGB_BLUE);
 	}
 	else if (g_air_status == 128)
 	{
-		set_rgb_color(255, 234, 0);
+		set_rgb_color(RGB_YELLOW);
 	}
 	else
 	{
-		set_rgb_color(255, 0, 0);
+		set_rgb_color(RGB_RED);
 	}
 
 	display.setFont(SMALL_FONT);

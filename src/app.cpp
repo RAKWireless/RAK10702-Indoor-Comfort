@@ -38,6 +38,8 @@ bool g_is_using_battery = false;
 
 char disp_txt[64] = {0};
 
+bool rgb_on = true;
+
 /**
  * @brief Application specific setup functions
  *
@@ -89,9 +91,6 @@ void setup_app(void)
 	// Initialize the User AT command list
 	init_user_at();
 
-	// Check if device is running from battery
-	g_is_using_battery = read_batt() < 1.0 ? false : true;
-
 	// Enable BLE
 	g_enable_ble = true;
 }
@@ -133,11 +132,16 @@ bool init_app(void)
 
 	set_rgb_color(255, 255, 0);
 
+	// Check if device is running from battery
+	MYLOG("APP", "Battery level is %.3f", read_batt());
+	// g_is_using_battery = read_batt() < 50 ? false : true;
+
 	// If on battery usage, start timer to
 	if (g_is_using_battery)
 	{
 		MYLOG("APP", "Device is battery powered!");
 		rgb_off.begin(15000, switch_rgb_off, NULL, false);
+		rgb_off.start();
 	}
 
 	// Prepare timer to send after the sensors were awake for 30 seconds
@@ -161,8 +165,29 @@ void app_event_handler(void)
 	if ((g_task_event_type & LED_REQ) == LED_REQ)
 	{
 		g_task_event_type &= N_LED_REQ;
-		MYLOG("APP", "RGB off after 15 seconds");
-		set_rgb_color(0, 0, 0);
+		MYLOG("APP", "RGB toggle every 15 seconds");
+
+		if (rgb_on)
+		{
+			set_rgb_color(0, 0, 0);
+			rgb_on = false;
+		}
+		else
+		{
+			if (g_air_status == 0)
+			{
+				set_rgb_color(0, 0, 128);
+			}
+			else if (g_air_status == 128)
+			{
+				set_rgb_color(128, 128, 0);
+			}
+			else
+			{
+				set_rgb_color(128, 0, 0);
+			}
+			rgb_on = true;
+		}
 	}
 
 	// Unoccupied event
@@ -171,7 +196,7 @@ void app_event_handler(void)
 		g_task_event_type &= N_ROOM_EMPTY;
 		MYLOG("APP", "Room is not occupied, start power savings");
 		api_timer_restart(g_lorawan_settings.send_repeat_time * 2);
-		set_rgb_color(0, 0, 0);
+		// set_rgb_color(0, 0, 0);
 		g_is_unoccupied = true;
 	}
 
@@ -204,6 +229,7 @@ void app_event_handler(void)
 	if ((g_task_event_type & STATUS) == STATUS)
 	{
 		MYLOG("APP", "Wake-up, power up sensors");
+		// power_modules(true);
 		g_task_event_type &= N_STATUS;
 		delayed_sending.start();
 	}
@@ -229,6 +255,9 @@ void app_event_handler(void)
 		// Get battery level
 		float batt_level_f = read_batt();
 		g_solution_data.addVoltage(LPP_CHANNEL_BATT, batt_level_f / 1000.0);
+
+		// Add occupation information
+		g_solution_data.addPresence(LPP_CHANNEL_SWITCH, g_is_unoccupied);
 
 		MYLOG("APP", "Packetsize %d", g_solution_data.getSize());
 		bool refresh_without_send = true;
@@ -283,6 +312,8 @@ void app_event_handler(void)
 			wake_rak14000();
 		}
 #endif
+		// Power down the modules
+		// power_modules(false);
 	}
 
 	// VOC read request event
@@ -402,11 +433,11 @@ void lora_data_handler(void)
 			AT_PRINTF("+EVT:SEND OK\n");
 		}
 
-		if (g_is_using_battery)
-		{
-			MYLOG("APP", "On battery, switch off the RGB after 15 seconds");
-			rgb_off.start();
-		}
+		// if (g_is_using_battery)
+		// {
+		// 	MYLOG("APP", "On battery, switch off the RGB after 15 seconds");
+		// 	rgb_off.start();
+		// }
 		if (!g_rx_fin_result)
 		{
 			// Increase fail send counter

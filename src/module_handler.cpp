@@ -367,7 +367,10 @@ void get_sensor_values(void)
  */
 void power_modules(bool switch_on)
 {
-	g_sensors_off = !switch_on;
+	if (!switch_on)
+	{
+		g_sensors_off = true;
+	}
 
 	if (found_sensors[TEMP_ID].found_sensor)
 	{
@@ -437,6 +440,10 @@ void power_modules(bool switch_on)
 			{
 				startup_rak12037();
 			}
+			else
+			{
+				shut_down_rak12037();
+			}
 		}
 
 		if (found_sensors[PM_ID].found_sensor)
@@ -445,11 +452,19 @@ void power_modules(bool switch_on)
 			{
 				startup_rak12039();
 			}
+			else{
+				shut_down_rak12039();
+			}
 		}
 
-		if (!switch_on)
-		{
-			digitalWrite(CO2_PM_POWER, LOW); // power off RAK12037 and RAK12039
-		}
+		// if (!switch_on)
+		// {
+		// 	digitalWrite(CO2_PM_POWER, LOW); // power off RAK12037 and RAK12039
+		// }
+	}
+
+	if (switch_on)
+	{
+		g_sensors_off = false;
 	}
 }

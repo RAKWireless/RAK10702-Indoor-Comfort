@@ -22,7 +22,7 @@ void icon_rak14000(void)
 	g_air_status = 0;
 
 	x_text = 250;
-	y_text = 45;
+	y_text = 35;
 	display.setFont(SMALL_FONT);
 	display.setTextSize(1);
 
@@ -61,17 +61,17 @@ void icon_rak14000(void)
 
 	snprintf(disp_text, 29, "Temperature: %.2f~C", temp_values[temp_idx - 1]);
 	text_rak14000(x_text, y_text, disp_text, txt_color, 1);
-	y_text += 40;
+	y_text += 35;
 
 	snprintf(disp_text, 29, "Humidity: %.2f%%RH", humid_values[humid_idx - 1]);
 	text_rak14000(x_text, y_text, disp_text, txt_color, 1);
-	y_text += 40;
+	y_text += 35;
 
 	if ((found_sensors[ENV_ID].found_sensor) || (found_sensors[PRESS_ID].found_sensor))
 	{
 		snprintf(disp_text, 29, "Baro: %.2fmBar", baro_values[baro_idx - 1]);
 		text_rak14000(x_text, y_text, disp_text, txt_color, 1);
-		y_text += 40;
+		y_text += 35;
 	}
 
 	uint8_t level = 0;
@@ -100,7 +100,7 @@ void icon_rak14000(void)
 		snprintf(disp_text, 29, "VOC %d", voc_values[voc_idx - 1]);
 		text_rak14000(x_text, y_text, disp_text, txt_color, 1);
 		draw_bar_rak14000(level, display_width - 72, y_text);
-		y_text += 40;
+		y_text += 35;
 	}
 
 	if (found_sensors[CO2_ID].found_sensor)
@@ -123,14 +123,13 @@ void icon_rak14000(void)
 		snprintf(disp_text, 29, "CO2 %.0f", co2_values[co2_idx - 1]);
 		text_rak14000(x_text, y_text, disp_text, txt_color, 1);
 		draw_bar_rak14000(level, display_width - 72, y_text);
-		y_text += 40;
+		y_text += 35;
 	}
 	if (found_sensors[PM_ID].found_sensor)
 	{
 		// PM 1.0 levels
 		if (pm10_values[pm_idx - 1] > 75)
 		{
-			snprintf(disp_text, 29, "PM 1.0: %d", pm10_values[pm_idx - 1]);
 			if (g_air_status < 255)
 			{
 				g_air_status = 255;
@@ -138,7 +137,6 @@ void icon_rak14000(void)
 		}
 		else if (pm10_values[pm_idx - 1] > 35)
 		{
-			snprintf(disp_text, 29, "PM 1.0: %d", pm10_values[pm_idx - 1]);
 			if (g_air_status < 128)
 			{
 				g_air_status = 128;
@@ -147,7 +145,6 @@ void icon_rak14000(void)
 		// PM 2.5 levels
 		if (pm25_values[pm_idx - 1] > 75)
 		{
-			snprintf(disp_text, 29, "PM 2.5: %d", pm25_values[pm_idx - 1]);
 			if (g_air_status < 255)
 			{
 				g_air_status = 255;
@@ -155,7 +152,6 @@ void icon_rak14000(void)
 		}
 		else if (pm25_values[pm_idx - 1] > 35)
 		{
-			snprintf(disp_text, 29, "PM 2.5: %d", pm25_values[pm_idx - 1]);
 			if (g_air_status < 128)
 			{
 				g_air_status = 128;
@@ -164,7 +160,6 @@ void icon_rak14000(void)
 		// PM 10 levels
 		if (pm100_values[pm_idx - 1] > 199)
 		{
-			snprintf(disp_text, 29, "PM 10: %d", pm100_values[pm_idx - 1]);
 			if (g_air_status < 255)
 			{
 				g_air_status = 255;
@@ -172,7 +167,6 @@ void icon_rak14000(void)
 		}
 		else if (pm100_values[pm_idx - 1] > 150)
 		{
-			snprintf(disp_text, 29, "PM 10: %d", pm10_values[pm_idx - 1]);
 			if (g_air_status < 128)
 			{
 				g_air_status = 128;
@@ -182,34 +176,38 @@ void icon_rak14000(void)
 		snprintf(disp_text, 29, "PM 1.0: %d", pm10_values[pm_idx - 1]);
 		text_rak14000(x_text, y_text, disp_text, txt_color, 1);
 		draw_bar_rak14000(level, display_width - 72, y_text);
-		y_text += 40;
+		y_text += 35;
 		level = (uint8_t)(pm25_values[pm_idx - 1] / 15);
 		snprintf(disp_text, 29, "PM 2.5: %d", pm25_values[pm_idx - 1]);
 		text_rak14000(x_text, y_text, disp_text, txt_color, 1);
 		draw_bar_rak14000(level, display_width - 72, y_text);
-		y_text += 40;
+		y_text += 35;
 		level = (uint8_t)(pm100_values[pm_idx - 1] / 40);
 		snprintf(disp_text, 29, "PM 10: %d", pm100_values[pm_idx - 1]);
 		text_rak14000(x_text, y_text, disp_text, txt_color, 1);
 		draw_bar_rak14000(level, display_width - 72, y_text);
-		y_text += 40;
+		y_text += 35;
 	}
 
 	if (old_air_status != g_air_status)
 	{
 		g_status_changed = true;
 	}
+
 	if (g_air_status == 0)
 	{
-		display.drawBitmap((300 - good_air_width) / 2, (300 - good_air_height) / 2, good_air, good_air_width, good_air_height, txt_color);
+		display.drawBitmap((x_text - good_air_width) / 2, (display_height - 20 - good_air_height) / 2, good_air, good_air_width, good_air_height, txt_color);
+		set_rgb_color(RGB_BLUE);
 	}
-	else if (g_air_status == 128)
+	else if (g_air_status < 255)
 	{
-		display.drawBitmap((300 - bad_air_width) / 2, (300 - bad_air_height) / 2, bad_air, bad_air_width, bad_air_height, txt_color);
+		display.drawBitmap((x_text - bad_air_width) / 2, (display_height - 20 - bad_air_height) / 2, worried_air, worried_air_width, worried_air_height, txt_color);
+		set_rgb_color(RGB_YELLOW);
 	}
 	else
 	{
-		display.drawBitmap((300 - worried_air_width) / 2, (300 - worried_air_height) / 2, worried_air, worried_air_width, worried_air_height, txt_color);
+		display.drawBitmap((x_text - worried_air_width) / 2, (display_height - 20 - worried_air_height) / 2, bad_air, bad_air_width, bad_air_height, txt_color);
+		set_rgb_color(RGB_RED);
 	}
 }
 
