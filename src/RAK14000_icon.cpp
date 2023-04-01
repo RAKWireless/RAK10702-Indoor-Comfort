@@ -1,7 +1,7 @@
 /**
  * @file rak14000_scientific_ui.cpp
  * @author Bernd Giesecke (bernd@giesecke.tk)
- * @brief Display functions for scientific UI
+ * @brief Display functions for simple UI
  * @version 0.1
  * @date 2023-03-26
  *

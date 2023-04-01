@@ -98,12 +98,15 @@ void read_rak12039(void)
  */
 void startup_rak12039(void)
 {
+#ifdef SENSOR_POWER_OFF
 	// Sensor on
-	// digitalWrite(CO2_PM_POWER, HIGH); // power on RAK12039
+	digitalWrite(CO2_PM_POWER, HIGH); // power on RAK12039
+	init_rak12039();
+#else
 	digitalWrite(SET_PIN, HIGH);
 	// Wait for wakeup
 	time_t wait_sensor = millis();
-	MYLOG("PM", "RAK12039 wake-up scan start %ld ms", millis());
+	MYLOG("PMS", "RAK12039 wake-up scan start %ld ms", millis());
 	byte error;
 	while (1)
 	{
@@ -112,17 +115,16 @@ void startup_rak12039(void)
 		error = Wire.endTransmission();
 		if (error == 0)
 		{
-			MYLOG("PM", "RAK12039 answered at %ld ms", millis());
+			MYLOG("PMS", "RAK12039 answered at %ld ms", millis());
 			break;
 		}
 		if ((millis() - wait_sensor) > 10000)
 		{
-			MYLOG("PM", "RAK12039 timeout after 10000 ms");
+			MYLOG("PMS", "RAK12039 timeout after 10000 ms");
 			break;
 		}
 	}
-
-	// init_rak12039();
+#endif
 }
 
 /**
@@ -131,8 +133,11 @@ void startup_rak12039(void)
  */
 void shut_down_rak12039(void)
 {
+#ifdef SENSOR_POWER_OFF
 	// Disable power
-	// digitalWrite(CO2_PM_POWER, LOW); // power off RAK12039
-
-	digitalWrite(SET_PIN, LOW); // Sensor on
+	digitalWrite(CO2_PM_POWER, LOW); // power off RAK12039
+#else
+	digitalWrite(SET_PIN, LOW); // Sensor off
+	MYLOG("PMS", "RAK12039 fan off");
+#endif
 }

@@ -26,7 +26,7 @@ bool init_rak12037(void)
 	// digitalWrite(CO2_PM_POWER, HIGH); // power on RAK12037
 
 	delay(250);
-	
+
 	if (!scd30.begin(Wire))
 	{
 		MYLOG("SCD30", "SCD30 not found");
@@ -35,8 +35,7 @@ bool init_rak12037(void)
 
 	//**************init SCD30 sensor *****************************************************
 	// Change number of seconds between measurements: 2 to 1800 (30 minutes), stored in non-volatile memory of SCD30
-	scd30.setMeasurementInterval(10);
-
+	scd30.setMeasurementInterval(2);
 	// Enable self calibration
 	scd30.setAutoSelfCalibration(true);
 
@@ -90,16 +89,20 @@ void read_rak12037(void)
  */
 void startup_rak12037(void)
 {
-	// digitalWrite(CO2_PM_POWER, HIGH); // power off RAK12037
+#ifdef SENSOR_POWER_OFF
+	// Power up the sensor
+	digitalWrite(CO2_PM_POWER, HIGH); // power off RAK12037
+	init_rak12037();
+#else
 	// Change number of seconds between measurements: 2 to 1800 (30 minutes), stored in non-volatile memory of SCD30
-	scd30.setMeasurementInterval(10);
+	scd30.setMeasurementInterval(2);
 
 	// Enable self calibration
 	scd30.setAutoSelfCalibration(true);
 
 	// Start the measurements
 	scd30.beginMeasuring();
-	// init_rak12037();
+#endif
 }
 
 /**
@@ -108,7 +111,10 @@ void startup_rak12037(void)
  */
 void shut_down_rak12037(void)
 {
+#ifdef SENSOR_POWER_OFF
 	// Disable power
-	// digitalWrite(CO2_PM_POWER, LOW); // power off RAK12037
+	digitalWrite(CO2_PM_POWER, LOW); // power off RAK12037
+#else
 	scd30.StopMeasurement();
+#endif
 }

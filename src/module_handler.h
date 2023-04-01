@@ -15,7 +15,7 @@
 
 extern SoftwareTimer delayed_sending;
 void send_delayed(TimerHandle_t unused);
-void switch_rgb_off(TimerHandle_t unused);
+void do_rgb_toggle(TimerHandle_t unused);
 
 /** Wakeup triggers for application events */
 #define MOTION_TRIGGER 0b1000000000000000
@@ -176,7 +176,7 @@ void humid_rak14000(bool has_pm, bool has_baro);
 void baro_rak14000(bool has_pm);
 void co2_rak14000(bool has_pm);
 void pm_rak14000(void);
-void status_general_rak14000(bool has_pm);
+void status_ui_rak14000(void);
 void status_rak14000(void);
 void rak14000_start_screen(bool startup = true);
 void rak14000_switch_bg(void);
@@ -211,6 +211,8 @@ extern bool g_status_changed;
 
 // PIR stuff
 void init_pir(void);
+void shut_down_pir(void);
+void startup_pir(void);
 extern bool g_occupied;
 #define PIR_INT 25 // WB_I2C2_SCL
 

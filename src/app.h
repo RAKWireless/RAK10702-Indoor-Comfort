@@ -49,6 +49,10 @@
 			PRINTF("[%s] ", tag);           \
 		PRINTF(__VA_ARGS__);                \
 		PRINTF("\n");                       \
+		if (tag)                            \
+			Serial1.printf("[%s] ", tag);   \
+		Serial1.printf(__VA_ARGS__);        \
+		Serial1.printf("\n");               \
 		if (g_ble_uart_is_connected)        \
 		{                                   \
 			g_ble_uart.printf(__VA_ARGS__); \
@@ -96,5 +100,4 @@ struct date_time_s
 };
 extern date_time_s g_date_time;
 
-extern bool g_is_unoccupied;
 #endif

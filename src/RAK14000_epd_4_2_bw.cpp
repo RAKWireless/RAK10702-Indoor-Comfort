@@ -84,8 +84,8 @@ uint16_t spacer;
 /** Timer to switch off display */
 SoftwareTimer display_off;
 
-/** UI selector. 0 = Icon, 1 = scientific*/
-uint8_t ui_selected = 1;
+/** UI selector. 0 = scientific, 1 = Icon, 2 = Status */
+uint8_t ui_selected = 0;
 
 /**
  * @brief Initialization of RAK14000 EPD
@@ -163,12 +163,12 @@ void clear_rak14000(void)
 /**
  * @brief Switch the UI to the next version.
  *			Triggered by button
- * 
+ *
  */
 void switch_ui(void)
 {
-	ui_selected +=1;
-	if (ui_selected == 2)
+	ui_selected += 1;
+	if (ui_selected == 3)
 	{
 		ui_selected = 0;
 	}
@@ -189,13 +189,17 @@ void refresh_rak14000(void)
 	// Clear display buffer
 	clear_rak14000();
 
-	if (ui_selected == 1)
+	switch (ui_selected)
 	{
+	case 0:
 		scientific_rak14000();
-	}
-	else
-	{
+		break;
+	case 1:
 		icon_rak14000();
+		break;
+	case 2:
+		status_ui_rak14000();
+		break;
 	}
 
 	delay(100);
@@ -486,7 +490,7 @@ void epd_task(void *pvParameters)
 
 		if (xSemaphoreTake(g_epd_sem, portMAX_DELAY) == pdTRUE)
 		{
-			if (!g_is_unoccupied)
+			if (g_occupied)
 			{
 				// if (g_epd_off)
 				// {

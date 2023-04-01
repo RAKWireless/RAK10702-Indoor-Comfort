@@ -304,6 +304,12 @@ void get_sensor_values(void)
 		read_rak1901();
 	}
 
+	if (found_sensors[BAR_ID].found_sensor)
+	{
+		// Read barometer data
+		read_rak1902();
+	}
+
 	if (found_sensors[LIGHT_ID].found_sensor)
 	{
 		// Read environment data

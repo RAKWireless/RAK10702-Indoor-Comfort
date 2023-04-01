@@ -152,9 +152,11 @@ void read_rak12047(void)
  */
 void do_read_rak12047(void)
 {
+#ifdef SENSOR_SHUT_DOWN
+	// Power-up the PIR sensor
+	startup_pir();
+#endif
 	uint16_t error;
-	// float humidity = 0;	   // %RH
-	// float temperature = 0; // degreeC
 	uint16_t srawVoc = 0;
 	uint16_t defaultRh = 0x8000;
 	uint16_t defaultT = 0x6666;
@@ -247,4 +249,9 @@ void do_read_rak12047(void)
 			MYLOG("VOC", "VOC: %ld", voc_index);
 		}
 	}
+
+#ifdef SENSOR_SHUT_DOWN
+	// Check the PIR sensor
+	shut_down_pir();
+#endif
 }

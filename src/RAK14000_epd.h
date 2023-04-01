@@ -1,12 +1,10 @@
 /**
  * @file RAK14000_epd.h
  * @author Bernd Giesecke (bernd@giesecke.tk)
- * @brief Images for the EPD display
+ * @brief Includes and defines for the EPD display
  * @version 0.1
- * @date 2022-06-25
+ * @date 2023-04-01
  *
- * @copyright Copyright (c) 2022
- * Images cortesy of <a href="https://www.flaticon.com/free-icons" title="Freepik - Flaticon">Icons created by Freepik - Flaticon</a>
  */
 
 #ifndef _RAK14000_EPD_H_
@@ -161,7 +159,7 @@ extern GFXfont RAK_EPD_20pt;
 #define EPD_BUSY WB_IO4
 
 #define RGB_BLUE 0,0,255
-#define RGB_YELLOW 255,234,0
+#define RGB_YELLOW 246,190,0
 #define RGB_RED 255,0,0
 
 #endif // _RAK14000_EPD_H_

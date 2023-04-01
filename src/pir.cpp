@@ -10,15 +10,18 @@
  */
 #include "app.h"
 
+/** Flag if occupancy was detected */
 bool g_occupied = true;
 
 /** Timer for VOC measurement */
 SoftwareTimer occupation_timer;
 
+/**
+ * @brief Interrupt callback for PIR sensor
+ * 
+ */
 void pir_int(void)
 {
-	MYLOG("PIR", "Triggered");
-	Serial.flush();
 	// Restart the occupation timer
 	occupation_timer.stop();
 	occupation_timer.start();
@@ -31,6 +34,12 @@ void pir_int(void)
 	g_occupied = true;
 }
 
+/**
+ * @brief Timer callback if room is unoccupied for a long time
+ * 		Time is set with the timer start, default is 10 minutes
+ * 
+ * @param unused 
+ */
 void occupation_timeout(TimerHandle_t unused)
 {
 	g_occupied = false;
@@ -38,18 +47,46 @@ void occupation_timeout(TimerHandle_t unused)
 	api_wake_loop(ROOM_EMPTY);
 }
 
+/**
+ * @brief Initialize the PIR sensor
+ * 
+ */
 void init_pir(void)
 {
 	// PIR POWER
 	pinMode(PIR_POWER, OUTPUT);
 	digitalWrite(PIR_POWER, HIGH);
 
-	// PIR INTERRPUT
 	pinMode(PIR_INT, INPUT);
+
+#ifndef SENSOR_SHUT_DOWN
+	// PIR INTERRPUT
 	attachInterrupt(PIR_INT, pir_int, RISING);
+#endif
 
 	// Start timer for occupation detection (10 minutes)
 	occupation_timer.begin(10 * 60 * 1000, occupation_timeout, NULL, false);
 	// occupation_timer.begin(30 * 1000, occupation_timeout, NULL, false);
 	occupation_timer.start();
+}
+
+/**
+ * @brief Power up PIR sensor 
+ * 		used when sensor shutdown is enabled
+ * 
+ */
+void startup_pir(void)
+{
+	digitalWrite(PIR_POWER, HIGH);
+	delay(100);
+	attachInterrupt(PIR_INT, pir_int, RISING);
+}
+
+/**
+ * @brief Shutdown power of the PIR sensor
+ * 
+ */
+void shut_down_pir(void)
+{
+	digitalWrite(PIR_POWER, LOW);
 }

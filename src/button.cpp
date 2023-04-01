@@ -23,12 +23,9 @@ bool timer_running = false;
  * 		Second parameter defines button pushed states:
  * 			true if active low (LOW if pressed)
  * 			false if active high (HIGH if pressed)
- *
- * @return OneButton
  */
 OneButton button(BUTTON_INT, true);
 
-// save the millis when a press has started.
 /** Time when button was pressed, used to determine length of long press */
 unsigned long pressStartTime;
 
@@ -36,7 +33,7 @@ unsigned long pressStartTime;
  * @brief Button interrupt callback
  * 		calls button.tick() to process status
  * 		start a timer to frequently repeat button status process until event is handled
- * 
+ *
  */
 void checkTicks(void)
 {
@@ -48,8 +45,6 @@ void checkTicks(void)
 		button_check.start();
 	}
 }
-
-// this function will be called when the button was pressed 1 time only.
 
 /**
  * @brief Callback if single button push was detected
@@ -78,13 +73,11 @@ void doubleClick(void)
 	rak14000_switch_bg();
 }
 
-// this function will be called when the button was pressed multiple times in a short timeframe.
-
 /**
- * @brief Callback for multi push button events
+ * @brief Callback for multi push button events (> 3 push)
  * 		Used for different functionalities
  *      - 9 times ==> reset device
- * 
+ *
  */
 void multiClick()
 {
@@ -93,7 +86,15 @@ void multiClick()
 	uint8_t tick_num = button.getNumberClicks();
 	switch (tick_num)
 	{
+	case 3:
+		// If BLE is enabled, restart Advertising
+		if (g_enable_ble)
+		{
+			restart_advertising(15);
+		}
+		break;
 	case 9:
+		MYLOG("BTN", "RST request");
 		if (g_epd_off)
 		{
 			MYLOG("BTN", "EPD was off");
@@ -104,16 +105,14 @@ void multiClick()
 		api_reset();
 		break;
 	default:
-		MYLOG("BTN", "multiClick(%d) detected.",button.getNumberClicks());
+		MYLOG("BTN", "multiClick(%d) detected.", button.getNumberClicks());
 		break;
 	}
 }
 
-// this function will be called when the button was held down for 1 second or more.
-
 /**
  * @brief Callback when a button is pushed, records the start time of a long press
- * 
+ *
  */
 void pressStart(void)
 {
@@ -121,12 +120,10 @@ void pressStart(void)
 	pressStartTime = millis() - 1000; // as set in setPressTicks()
 }
 
-// this function will be called when the button was released after a long hold.
-
 /**
  * @brief Callback when a long-press event has finished
  * 		Unused at the moment
- * 
+ *
  */
 void pressStop(void)
 {
@@ -138,8 +135,8 @@ void pressStop(void)
 /**
  * @brief Timer callback after a button push event was detected.
  * 		Needed to continue to check the button status
- * 
- * @param unused 
+ *
+ * @param unused
  */
 void check_button(TimerHandle_t unused)
 {
@@ -148,7 +145,7 @@ void check_button(TimerHandle_t unused)
 
 /**
  * @brief Initialize Button functions
- * 
+ *
  */
 void init_button(void)
 {
