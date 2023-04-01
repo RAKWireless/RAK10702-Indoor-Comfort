@@ -153,6 +153,7 @@ void read_rak12039(void);
 bool init_rak12047(void);
 void read_rak12047(void);
 void do_read_rak12047(void);
+extern volatile bool g_voc_is_active;
 
 void find_modules(void);
 void announce_modules(void);
@@ -177,7 +178,6 @@ void baro_rak14000(bool has_pm);
 void co2_rak14000(bool has_pm);
 void pm_rak14000(void);
 void status_ui_rak14000(void);
-void status_rak14000(void);
 void rak14000_start_screen(bool startup = true);
 void rak14000_switch_bg(void);
 void startup_rak14000(void);

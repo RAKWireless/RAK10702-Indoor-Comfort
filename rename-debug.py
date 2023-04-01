@@ -1,4 +1,9 @@
 import datetime
+import shutil
+import os
+
+if os.path.exists("./Debug-Build"):
+	shutil.rmtree("./Debug-Build")
 
 Import("env")
 

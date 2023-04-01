@@ -107,6 +107,7 @@ void init_rak14000(void)
 	{
 		MYLOG("EPD", "Failed to start EPD task");
 	}
+
 	MYLOG("EPD", "Initialized 4.2\" display");
 
 	// Prepare display off timer
@@ -205,28 +206,6 @@ void refresh_rak14000(void)
 	delay(100);
 	display.display();
 	delay(100);
-}
-
-/**
- * @brief Display device status
- *
- */
-void status_rak14000(void)
-{
-	// Clear display buffer
-	clear_rak14000();
-
-	if (found_sensors[RTC_ID].found_sensor)
-	{
-		read_rak12002();
-
-		snprintf(disp_text, 59, "Status RAK10702   %s %d %d %02d:%02d",
-				 months_txt[g_date_time.month - 1], g_date_time.date, g_date_time.year,
-				 g_date_time.hour, g_date_time.minute);
-	}
-
-	display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-	text_rak14000((display_width / 2) - (txt_w / 2), 1, disp_text, (uint16_t)txt_color, 1);
 }
 
 /**
@@ -492,17 +471,17 @@ void epd_task(void *pvParameters)
 		{
 			if (g_occupied)
 			{
-				// if (g_epd_off)
-				// {
-				// 	MYLOG("EPD", "EPD was off");
-				// 	startup_rak14000();
-				// }
+				if (g_epd_off)
+				{
+					MYLOG("EPD", "EPD was off");
+					startup_rak14000();
+				}
 
-				display.powerUp();
+				// display.powerUp();
 				refresh_rak14000();
-				display.powerDown();
+				// display.powerDown();
 				// Start timer to shut down EPD after 5 seconds (give time to refresh full screen)
-				// display_off.start();
+				display_off.start();
 			}
 			else
 			{
@@ -531,6 +510,12 @@ void startup_rak14000(void)
  */
 void shut_down_rak14000(TimerHandle_t unused)
 {
+	// If VOC is active wait before shutting down
+	if (g_voc_is_active)
+	{
+		display_off.start();
+		return;
+	}
 	// Disable power
 	digitalWrite(EPD_POWER, LOW);
 	g_epd_off = true;

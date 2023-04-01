@@ -68,7 +68,7 @@ void status_ui_rak14000(void)
 	display.setFont(SMALL_FONT);
 	display.setTextSize(1);
 
-	snprintf(disp_text, 29, "Device LoRa/LoRaWAN Status:", temp_values[temp_idx - 1]);
+	snprintf(disp_text, 29, "Device LoRa/LoRaWAN Status:");
 	text_rak14000(x_text, y_text, disp_text, txt_color, 1);
 	y_text += 15;
 
@@ -114,7 +114,7 @@ void status_ui_rak14000(void)
 		{
 			snprintf(disp_text, 29, "Device EUI:");
 			text_rak14000(x_text, y_text, disp_text, txt_color, 1);
-			snprintf(disp_text, 29, "%02X%02X%02X%02X%02X%02X%02X%02X", g_lorawan_settings.node_device_eui[0], g_lorawan_settings.node_device_eui[1],
+			snprintf(disp_text, 59, "%02X%02X%02X%02X%02X%02X%02X%02X", g_lorawan_settings.node_device_eui[0], g_lorawan_settings.node_device_eui[1],
 					 g_lorawan_settings.node_device_eui[2], g_lorawan_settings.node_device_eui[3],
 					 g_lorawan_settings.node_device_eui[4], g_lorawan_settings.node_device_eui[5],
 					 g_lorawan_settings.node_device_eui[6], g_lorawan_settings.node_device_eui[7]);
@@ -123,7 +123,7 @@ void status_ui_rak14000(void)
 
 			snprintf(disp_text, 29, "Application EUI:");
 			text_rak14000(x_text, y_text, disp_text, txt_color, 1);
-			snprintf(disp_text, 29, "%02X%02X%02X%02X%02X%02X%02X%02X", g_lorawan_settings.node_app_eui[0], g_lorawan_settings.node_app_eui[1],
+			snprintf(disp_text, 59, "%02X%02X%02X%02X%02X%02X%02X%02X", g_lorawan_settings.node_app_eui[0], g_lorawan_settings.node_app_eui[1],
 					 g_lorawan_settings.node_app_eui[2], g_lorawan_settings.node_app_eui[3],
 					 g_lorawan_settings.node_app_eui[4], g_lorawan_settings.node_app_eui[5],
 					 g_lorawan_settings.node_app_eui[6], g_lorawan_settings.node_app_eui[7]);
@@ -132,7 +132,7 @@ void status_ui_rak14000(void)
 
 			snprintf(disp_text, 29, "Application Key:");
 			text_rak14000(x_text, y_text, disp_text, txt_color, 1);
-			snprintf(disp_text, 29, "%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X",
+			snprintf(disp_text, 59, "%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X",
 					 g_lorawan_settings.node_app_key[0], g_lorawan_settings.node_app_key[1],
 					 g_lorawan_settings.node_app_key[2], g_lorawan_settings.node_app_key[3],
 					 g_lorawan_settings.node_app_key[4], g_lorawan_settings.node_app_key[5],
@@ -154,7 +154,7 @@ void status_ui_rak14000(void)
 
 			snprintf(disp_text, 29, "Network Session Key:");
 			text_rak14000(x_text, y_text, disp_text, txt_color, 1);
-			snprintf(disp_text, 29, "%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X",
+			snprintf(disp_text, 59, "%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X",
 					 g_lorawan_settings.node_nws_key[0], g_lorawan_settings.node_nws_key[1],
 					 g_lorawan_settings.node_nws_key[2], g_lorawan_settings.node_nws_key[3],
 					 g_lorawan_settings.node_nws_key[4], g_lorawan_settings.node_nws_key[5],
@@ -168,7 +168,7 @@ void status_ui_rak14000(void)
 
 			snprintf(disp_text, 29, "Application Session Key:");
 			text_rak14000(x_text, y_text, disp_text, txt_color, 1);
-			snprintf(disp_text, 29, "%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X",
+			snprintf(disp_text, 59, "%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X%02X",
 					 g_lorawan_settings.node_apps_key[0], g_lorawan_settings.node_apps_key[1],
 					 g_lorawan_settings.node_apps_key[2], g_lorawan_settings.node_apps_key[3],
 					 g_lorawan_settings.node_apps_key[4], g_lorawan_settings.node_apps_key[5],

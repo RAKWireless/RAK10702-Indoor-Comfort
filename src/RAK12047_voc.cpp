@@ -36,6 +36,9 @@ char errorMessage[256];
 /** Counter to discard the first 100 readings */
 uint16_t discard_counter = 0;
 
+/** Flag if VOC is active, used from display driver to avoid shut down of power */
+volatile bool g_voc_is_active = false;
+
 /**
  * @brief Timer callback to wakeup the loop with the VOC_REQ event
  *
@@ -156,6 +159,15 @@ void do_read_rak12047(void)
 	// Power-up the PIR sensor
 	startup_pir();
 #endif
+
+	/// \todo temporary solution requires to switch on/off power of the sensors
+	// if (g_epd_off)
+	{
+		g_voc_is_active = true;
+		MYLOG("VOC", "EPD is off, switching power on");
+		digitalWrite(EPD_POWER, HIGH);
+	}
+
 	uint16_t error;
 	uint16_t srawVoc = 0;
 	uint16_t defaultRh = 0x8000;
@@ -189,35 +201,18 @@ void do_read_rak12047(void)
 		}
 	}
 
-	// /// \todo temporary solution requires to switch on/off power of the sensors
-	// if (g_epd_off)
-	// {
-	// 	MYLOG("VOC", "EPD is off, switching power on");
-	// 	digitalWrite(EPD_POWER, HIGH);
-	// }
-	// if (g_sensors_off)
-	// {
-	// 	MYLOG("VOC", "Sensors are off, switching power on");
-	// 	digitalWrite(CO2_PM_POWER, HIGH); // power on RAK12037 & RAK12039
-	// 	delay(500);
-	// }
-
 	// 2. Measure SGP4x signals
 	error = sgp40.measureRawSignal(defaultRh, defaultT,
 								   srawVoc);
 	MYLOG("VOC", "srawVoc: %d", srawVoc);
 
-	// /// \todo temporary solution requires to switch on/off power of the sensors
-	// if (g_epd_off)
-	// {
-	// 	MYLOG("VOC", "EPD is off, switching power off");
-	// 	digitalWrite(EPD_POWER, LOW);
-	// }
-	// if (g_sensors_off)
-	// {
-	// 	MYLOG("VOC", "Sensors are off, switching power off");
-	// 	digitalWrite(CO2_PM_POWER, LOW); // power off RAK12037 & RAK12039
-	// }
+	/// \todo temporary solution requires to switch on/off power of the sensors
+	if (g_epd_off)
+	{
+		MYLOG("VOC", "EPD is off, switching power off");
+		digitalWrite(EPD_POWER, LOW);
+		g_voc_is_active = false;
+	}
 
 	// 3. Process raw signals by Gas Index Algorithm to get the VOC index values
 	if (error)

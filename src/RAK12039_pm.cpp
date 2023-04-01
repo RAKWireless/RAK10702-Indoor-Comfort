@@ -101,9 +101,10 @@ void startup_rak12039(void)
 #ifdef SENSOR_POWER_OFF
 	// Sensor on
 	digitalWrite(CO2_PM_POWER, HIGH); // power on RAK12039
-	init_rak12039();
 #else
 	digitalWrite(SET_PIN, HIGH);
+#endif
+
 	// Wait for wakeup
 	time_t wait_sensor = millis();
 	MYLOG("PMS", "RAK12039 wake-up scan start %ld ms", millis());
@@ -124,6 +125,9 @@ void startup_rak12039(void)
 			break;
 		}
 	}
+#ifdef SENSOR_POWER_OFF
+	// Init Sensor
+	init_rak12039();
 #endif
 }
 
