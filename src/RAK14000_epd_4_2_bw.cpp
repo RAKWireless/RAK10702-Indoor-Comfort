@@ -47,7 +47,7 @@ uint16_t txt_color = EPD_BLACK;
 uint8_t g_air_status = 0;
 bool g_status_changed = true;
 
-bool g_epd_off = false;
+volatile bool g_epd_off = false;
 
 /** EPD task handle */
 TaskHandle_t epd_task_handle;
@@ -85,7 +85,9 @@ uint16_t spacer;
 SoftwareTimer display_off;
 
 /** UI selector. 0 = scientific, 1 = Icon, 2 = Status */
-uint8_t ui_selected = 0;
+uint8_t g_ui_selected = 0;
+/** Save last selected UI, in case Status screen is forced */
+uint8_t g_ui_last = 0;
 
 /**
  * @brief Initialization of RAK14000 EPD
@@ -93,25 +95,35 @@ uint8_t ui_selected = 0;
  */
 void init_rak14000(void)
 {
-	digitalWrite(EPD_POWER, HIGH);
-
+	// if (g_is_using_battery)
+	// {
+	// 	MYLOG("EPD", "I2C might be off, switching power on");
+	// 	digitalWrite(EPD_POWER, HIGH);
+	// }
 	g_epd_off = false;
 
-	// Create the EPD event semaphore
-	g_epd_sem = xSemaphoreCreateBinary();
-	// Initialize semaphore
-	xSemaphoreGive(g_epd_sem);
-	// Take semaphore
-	xSemaphoreTake(g_epd_sem, 10);
-	if (!xTaskCreate(epd_task, "EPD", 4096, NULL, TASK_PRIO_LOW, &epd_task_handle))
-	{
-		MYLOG("EPD", "Failed to start EPD task");
-	}
+	// // Create the EPD event semaphore
+	// g_epd_sem = xSemaphoreCreateBinary();
+	// // Initialize semaphore
+	// xSemaphoreGive(g_epd_sem);
+	// // Take semaphore
+	// xSemaphoreTake(g_epd_sem, 10);
+	// if (!xTaskCreate(epd_task, "EPD", 4096, NULL, TASK_PRIO_LOW, &epd_task_handle))
+	// {
+	// 	MYLOG("EPD", "Failed to start EPD task");
+	// }
 
-	MYLOG("EPD", "Initialized 4.2\" display");
+	// MYLOG("EPD", "Initialized 4.2\" display");
 
-	// Prepare display off timer
-	display_off.begin(10000, shut_down_rak14000, NULL, false);
+	// // Prepare display off timer
+	// display_off.begin(10000, shut_down_rak14000, NULL, false);
+
+	display.begin();
+
+	display.setRotation(EPD_ROTATION); // 1 for Gavin 3 for mine
+	MYLOG("EPD", "Rotation %d", display.getRotation());
+
+	rak14000_start_screen();
 }
 
 /**
@@ -164,16 +176,20 @@ void clear_rak14000(void)
 /**
  * @brief Switch the UI to the next version.
  *			Triggered by button
- *
+ *			g_ui_selected options
+ *			0 = scientific
+ *			1 = iconized
+ *			2 = status screen (reset automatically on next update)
  */
 void switch_ui(void)
 {
-	ui_selected += 1;
-	if (ui_selected == 3)
+	g_ui_selected += 1;
+	if (g_ui_selected == 2)
 	{
-		ui_selected = 0;
+		g_ui_selected = 0;
 	}
-	wake_rak14000();
+	g_ui_last = g_ui_selected;
+	api_wake_loop(DISP_UPDATE);
 }
 
 /** Flag for first screen update */
@@ -190,7 +206,7 @@ void refresh_rak14000(void)
 	// Clear display buffer
 	clear_rak14000();
 
-	switch (ui_selected)
+	switch (g_ui_selected)
 	{
 	case 0:
 		scientific_rak14000();
@@ -371,7 +387,7 @@ void rak14000_start_screen(bool startup)
 
 	// Draw Welcome Logo
 	display.fillRect(0, 0, display_width, display_height, bg_color);
-	display.drawBitmap(display_width / 2 - 75, 50, rak_img, 184, 56, txt_color); // 184x56
+	display.drawBitmap(display_width / 2 - 92, 40, rak_img, 184, 56, txt_color); // 184x56
 
 	display.setFont(SMALL_FONT);
 	display.setTextSize(1);
@@ -406,8 +422,8 @@ void rak14000_start_screen(bool startup)
 	}
 	else
 	{
-		display.getTextBounds((char *)"Restart", 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-		text_rak14000(display_width / 2 - (txt_w / 2), 260, (char *)"Restart", (uint16_t)txt_color, 1);
+		display.getTextBounds((char *)"Thank you!", 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
+		text_rak14000(display_width / 2 - (txt_w / 2), 260, (char *)"Thank you!", (uint16_t)txt_color, 1);
 	}
 	display.display(false);
 }
@@ -417,8 +433,10 @@ void rak14000_switch_bg(void)
 	uint16_t old_txt = txt_color;
 	txt_color = bg_color;
 	bg_color = old_txt;
-	xSemaphoreGive(g_epd_sem);
-	delay(4000);
+	api_wake_loop(DISP_UPDATE);
+
+	// xSemaphoreGive(g_epd_sem);
+	// delay(4000);
 }
 
 /**
@@ -469,23 +487,34 @@ void epd_task(void *pvParameters)
 
 		if (xSemaphoreTake(g_epd_sem, portMAX_DELAY) == pdTRUE)
 		{
-			if (g_occupied)
+			MYLOG("EPD", "Start update");
+			if (g_is_using_battery)
 			{
 				if (g_epd_off)
 				{
 					MYLOG("EPD", "EPD was off");
 					startup_rak14000();
 				}
-
-				// display.powerUp();
-				refresh_rak14000();
-				// display.powerDown();
-				// Start timer to shut down EPD after 5 seconds (give time to refresh full screen)
-				display_off.start();
 			}
-			else
+
+			refresh_rak14000();
+
+			if (g_is_using_battery)
 			{
-				MYLOG("EPD", "Room is unoccupied");
+				if (g_voc_is_active)
+				{
+					MYLOG("EPD", "VOC is active, switch off in 10 seconds");
+					// Start timer to shut down EPD after 10 seconds (give time to refresh full screen)
+					display_off.start();
+					g_epd_off = true;
+				}
+				else
+				{
+					MYLOG("EPD", "VOC is not active, switch off now");
+					// Disable power
+					digitalWrite(EPD_POWER, LOW);
+					g_epd_off = true;
+				}
 			}
 		}
 	}
@@ -497,7 +526,11 @@ void epd_task(void *pvParameters)
  */
 void startup_rak14000(void)
 {
-	digitalWrite(EPD_POWER, HIGH);
+	if (g_is_using_battery)
+	{
+		MYLOG("EPD", "I2C might be off, switching power on");
+		digitalWrite(EPD_POWER, HIGH);
+	}
 	g_epd_off = false;
 	delay(250);
 	display.begin();
@@ -513,10 +546,15 @@ void shut_down_rak14000(TimerHandle_t unused)
 	// If VOC is active wait before shutting down
 	if (g_voc_is_active)
 	{
+		MYLOG("EPD", "VOC is still active, switch off in 10 seconds");
+
 		display_off.start();
-		return;
 	}
-	// Disable power
-	digitalWrite(EPD_POWER, LOW);
-	g_epd_off = true;
+	else
+	{
+		MYLOG("EPD", "VOC is off, switch off now");
+		// Disable power
+		digitalWrite(EPD_POWER, LOW);
+		g_epd_off = true;
+	}
 }

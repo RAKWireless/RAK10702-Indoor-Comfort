@@ -70,12 +70,18 @@ void status_ui_rak14000(void)
 
 	snprintf(disp_text, 29, "Device LoRa/LoRaWAN Status:");
 	text_rak14000(x_text, y_text, disp_text, txt_color, 1);
+
+	snprintf(disp_text, 29, "API version: %d.%d.%d", WISBLOCK_API_VER, WISBLOCK_API_VER2, WISBLOCK_API_VER3);
+	text_rak14000(x_text + 250, y_text, disp_text, txt_color, 1);
 	y_text += 15;
 
 	snprintf(disp_text, 29, "Send Interval:");
 	text_rak14000(x_text, y_text, disp_text, txt_color, 1);
 	snprintf(disp_text, 29, "%ld s", g_lorawan_settings.send_repeat_time / 1000);
 	text_rak14000(x_text + x_graph, y_text, disp_text, txt_color, 1);
+
+	snprintf(disp_text, 29, "FW version:  %d.%d.%d", SW_VERSION_1, SW_VERSION_2, SW_VERSION_3);
+	text_rak14000(x_text + 250, y_text, disp_text, txt_color, 1);
 	y_text += 15;
 
 	snprintf(disp_text, 29, "Device Power:");

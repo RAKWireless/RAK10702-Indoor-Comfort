@@ -17,6 +17,8 @@ SoftwareTimer button_check;
 // Flag if button timer is already running
 bool timer_running = false;
 
+extern SoftwareTimer voc_read_timer;
+
 /**
  * @brief Button instance
  * 		First parameter is interrupt input for button
@@ -37,8 +39,9 @@ unsigned long pressStartTime;
  */
 void checkTicks(void)
 {
-	// include all buttons here to be checked
-	button.tick(); // just call tick() to check the state.
+	// Button interrupt, call tick()
+	button.tick();
+	// If not already running, start the timer to frequently check the button status
 	if (!timer_running)
 	{
 		timer_running = true;
@@ -86,51 +89,63 @@ void multiClick()
 	uint8_t tick_num = button.getNumberClicks();
 	switch (tick_num)
 	{
+		// Enable BLE
 	case 3:
 		// If BLE is enabled, restart Advertising
 		if (g_enable_ble)
 		{
+			MYLOG("BTN", "BLE On.");
 			restart_advertising(15);
 		}
 		break;
-	case 9:
-		MYLOG("BTN", "RST request");
-		if (g_epd_off)
-		{
-			MYLOG("BTN", "EPD was off");
-			startup_rak14000();
-		}
-		rak14000_start_screen(false);
-		delay(3000);
-		api_reset();
+	// Show Device Status Screen
+	case 4:
+		g_ui_selected = 2;
+		api_wake_loop(DISP_UPDATE);
 		break;
+	// Only for testing, shut down everything
+	case 5:
+		// Stop everything
+		MYLOG("BTN", "Stopping everything.");
+		api_timer_stop();
+		digitalWrite(EPD_POWER, LOW);
+		digitalWrite(PIR_POWER, LOW);
+		digitalWrite(CO2_PM_POWER, LOW);
+		voc_read_timer.stop();
+		digitalWrite(VOC_POWER, LOW);
+		break;
+		// Reset the device
+	case 9:
+			MYLOG("BTN", "RST request");
+			api_wake_loop(RST_REQ);
+			break;
 	default:
 		MYLOG("BTN", "multiClick(%d) detected.", button.getNumberClicks());
 		break;
 	}
 }
 
-/**
- * @brief Callback when a button is pushed, records the start time of a long press
- *
- */
-void pressStart(void)
-{
-	MYLOG("BTN", "pressStart()");
-	pressStartTime = millis() - 1000; // as set in setPressTicks()
-}
+// /**
+//  * @brief Callback when a button is pushed, records the start time of a long press
+//  *
+//  */
+// void pressStart(void)
+// {
+// 	MYLOG("BTN", "pressStart()");
+// 	pressStartTime = millis() - 1000; // as set in setPressTicks()
+// }
 
-/**
- * @brief Callback when a long-press event has finished
- * 		Unused at the moment
- *
- */
-void pressStop(void)
-{
-	button_check.stop();
-	timer_running = false;
-	MYLOG("BTN", "pressStop(%d) detected.", (millis() - pressStartTime));
-}
+// /**
+//  * @brief Callback when a long-press event has finished
+//  * 		Unused at the moment
+//  *
+//  */
+// void pressStop(void)
+// {
+// 	button_check.stop();
+// 	timer_running = false;
+// 	MYLOG("BTN", "pressStop(%ld) detected.", (millis() - pressStartTime));
+// }
 
 /**
  * @brief Timer callback after a button push event was detected.
@@ -157,10 +172,10 @@ void init_button(void)
 	button.attachDoubleClick(doubleClick);
 	button.attachMultiClick(multiClick);
 
-	// Setup long press button events
-	button.setPressTicks(3000); // that is the time when LongPressStart is called
-	button.attachLongPressStart(pressStart);
-	button.attachLongPressStop(pressStop);
+	// // Setup long press button events
+	// button.setPressTicks(3000); // that is the time when LongPressStart is called
+	// button.attachLongPressStart(pressStart);
+	// button.attachLongPressStop(pressStop);
 
 	// Create timer for button handling
 	button_check.begin(10, check_button, NULL, true);

@@ -67,13 +67,6 @@ bool g_sensors_off = false;
  */
 void find_modules(void)
 {
-	// Scan the I2C interfaces for devices
-	byte error;
-	uint8_t num_dev = 0;
-
-	// pinMode(WB_IO2, OUTPUT);
-	// digitalWrite(WB_IO2, HIGH);
-
 	// RAK12039 has extra GPIO for power control
 	// On/Off control pin
 	pinMode(WB_IO6, OUTPUT);
@@ -82,148 +75,109 @@ void find_modules(void)
 	delay(500);
 
 	Wire.begin();
-	// Some modules support only 100kHz
-	Wire.setClock(100000);
-	for (byte address = 1; address < 127; address++)
+
+	if (!init_rak1901())
 	{
-		// RAK12039 takes up to 5 seconds before it responds on I2C
-		if (address == 0x12)
-		{
-			time_t wait_sensor = millis();
-			MYLOG("SCAN", "RAK12039 scan start %ld ms", millis());
-			while (1)
-			{
-				delay(500);
-				Wire.beginTransmission(address);
-				error = Wire.endTransmission();
-				if (error == 0)
-				{
-					MYLOG("SCAN", "RAK12039 answered at %ld ms", millis());
-					break;
-				}
-				if ((millis() - wait_sensor) > 10000)
-				{
-					MYLOG("SCAN", "RAK12039 timeout after 10000 ms");
-					break;
-				}
-			}
-		}
-		Wire.beginTransmission(address);
-		error = Wire.endTransmission();
-		if (error == 0)
-		{
-			MYLOG("SCAN", "Found sensor at I2C1 0x%02X", address);
-			for (uint8_t i = 0; i < sizeof(found_sensors) / sizeof(sensors_t); i++)
-			{
-				if (address == found_sensors[i].i2c_addr)
-				{
-					found_sensors[i].found_sensor = true;
-					break;
-				}
-			}
-			num_dev++;
-		}
+		found_sensors[TEMP_ID].found_sensor = false;
+	}
+	else
+	{
+		found_sensors[TEMP_ID].found_sensor = true;
 	}
 
-	Wire.setClock(100000); /// \todo Wire.setClock(400000);
-
-	MYLOG("SCAN", "Found %d sensors", num_dev);
-	for (uint8_t i = 0; i < sizeof(found_sensors) / sizeof(sensors_t); i++)
+	if (!init_rak1902())
 	{
-		if (found_sensors[i].found_sensor)
-		{
-			MYLOG("SCAN", "ID %d addr %02X", i, found_sensors[i].i2c_addr);
-		}
+		found_sensors[PRESS_ID].found_sensor = false;
+	}
+	else
+	{
+		found_sensors[PRESS_ID].found_sensor = true;
 	}
 
-	// Initialize the modules found
-	if (found_sensors[TEMP_ID].found_sensor)
+	if (!init_rak1903())
 	{
-		if (!init_rak1901())
-		{
-			found_sensors[TEMP_ID].found_sensor = false;
-		}
+		found_sensors[LIGHT_ID].found_sensor = false;
+	}
+	else
+	{
+		found_sensors[LIGHT_ID].found_sensor = true;
 	}
 
-	if (found_sensors[PRESS_ID].found_sensor)
-	{
-		if (!init_rak1902())
-		{
-			found_sensors[PRESS_ID].found_sensor = false;
-		}
-	}
-
-	if (found_sensors[LIGHT_ID].found_sensor)
-	{
-		if (!init_rak1903())
-		{
-			found_sensors[LIGHT_ID].found_sensor = false;
-		}
-	}
-
-	if (found_sensors[ENV_ID].found_sensor)
-	{
-		/*********************************************/
-		/** Select between Bosch BSEC algorithm for  */
-		/** IAQ index or simple T/H/P readings       */
-		/*********************************************/
+	/*********************************************/
+	/** Select between Bosch BSEC algorithm for  */
+	/** IAQ index or simple T/H/P readings       */
+	/*********************************************/
 #if USE_BSEC == 1
-		if (!init_rak1906_bsec()) // !!! USING Bosch BSEC
+	if (!init_rak1906_bsec()) // !!! USING Bosch BSEC
 #else
-		if (!init_rak1906()) // !!! USING SIMPLE READINGS
+	if (!init_rak1906()) // !!! USING SIMPLE READINGS
 #endif
-		{
-			found_sensors[ENV_ID].found_sensor = false;
-		}
+	{
+		found_sensors[ENV_ID].found_sensor = false;
+	}
+	else
+	{
+		found_sensors[ENV_ID].found_sensor = true;
 	}
 
-	if (found_sensors[RTC_ID].found_sensor)
+	Wire.beginTransmission(0x52);
+	byte error = Wire.endTransmission();
+	if (error == 0)
 	{
 		if (!init_rak12002())
 		{
 			found_sensors[RTC_ID].found_sensor = false;
 		}
-	}
-
-	if (found_sensors[LIGHT2_ID].found_sensor)
-	{
-		if (!init_rak12010())
+		else
 		{
-			found_sensors[LIGHT2_ID].found_sensor = false;
+			found_sensors[RTC_ID].found_sensor = true;
 		}
 	}
-
-	if (found_sensors[UVL_ID].found_sensor)
+	else
 	{
-		if (!init_rak12019())
-		{
-			found_sensors[UVL_ID].found_sensor = false;
-		}
+		found_sensors[RTC_ID].found_sensor = false;
 	}
 
-	if (found_sensors[CO2_ID].found_sensor)
+	if (!init_rak12010())
 	{
-		if (!init_rak12037())
-		{
-			found_sensors[CO2_ID].found_sensor = false;
-		}
+		found_sensors[LIGHT2_ID].found_sensor = false;
 	}
 
-	if (found_sensors[PM_ID].found_sensor)
+	if (!init_rak12019())
 	{
-		if (!init_rak12039())
-		{
-			found_sensors[PM_ID].found_sensor = false;
-		}
+		found_sensors[UVL_ID].found_sensor = false;
+	}
+	else
+	{
+		found_sensors[UVL_ID].found_sensor = true;
 	}
 
-	if (found_sensors[VOC_ID].found_sensor)
+	if (!init_rak12037())
 	{
-		MYLOG("APP", "Initialize RAK12047");
-		if (!init_rak12047())
-		{
-			found_sensors[VOC_ID].found_sensor = false;
-		}
+		found_sensors[CO2_ID].found_sensor = false;
+	}
+	else
+	{
+		found_sensors[CO2_ID].found_sensor = true;
+	}
+
+	if (!init_rak12039())
+	{
+		found_sensors[PM_ID].found_sensor = false;
+	}
+	else
+	{
+		found_sensors[PM_ID].found_sensor = true;
+	}
+
+	MYLOG("APP", "Initialize RAK12047");
+	if (!init_rak12047())
+	{
+		found_sensors[VOC_ID].found_sensor = false;
+	}
+	else
+	{
+		found_sensors[VOC_ID].found_sensor = true;
 	}
 }
 
@@ -327,10 +281,9 @@ void get_sensor_values(void)
 		read_rak1906_bsec();
 	}
 #else
-	// RAK1906 needs time to get correct value. Reading was already started and results will be gotten in app.cpp
 	if (found_sensors[ENV_ID].found_sensor)
 	{
-		// Start reading environment data
+		// Get environment data
 		read_rak1906();
 	}
 #endif
@@ -376,6 +329,12 @@ void power_modules(bool switch_on)
 	if (!switch_on)
 	{
 		g_sensors_off = true;
+	}
+	else
+	{
+		g_epd_off = false;
+		MYLOG("MOD", "I2C might be off, switching power on");
+		digitalWrite(EPD_POWER, HIGH);
 	}
 
 	if (found_sensors[TEMP_ID].found_sensor)
@@ -458,15 +417,11 @@ void power_modules(bool switch_on)
 			{
 				startup_rak12039();
 			}
-			else{
+			else
+			{
 				shut_down_rak12039();
 			}
 		}
-
-		// if (!switch_on)
-		// {
-		// 	digitalWrite(CO2_PM_POWER, LOW); // power off RAK12037 and RAK12039
-		// }
 	}
 
 	if (switch_on)

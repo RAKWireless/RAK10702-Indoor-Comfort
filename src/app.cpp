@@ -30,15 +30,33 @@ uint8_t join_send_fail = 0;
 /** LoRaWAN packet */
 WisCayenne g_solution_data(255);
 
-uint8_t unoccupied_counter = 0;
+/** Flag if a USB device is connected */
+bool g_no_usb = false;
 
+/** Flag if the device is battery or permanent powered */
 bool g_is_using_battery = false;
 
-char disp_txt[64] = {0};
-
-bool rgb_on = true;
-
-#include <nrfx_power.h>
+// Callback if USB line status changes
+/**
+ * @brief Callback if USB line status changes
+ *
+ * @param itf not used
+ * @param dtr status of DTR line
+ * @param rts status of RTS line
+ */
+void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
+{
+	if (dtr)
+	{
+		Serial.begin(115200);
+		g_no_usb = false;
+	}
+	else
+	{
+		Serial.end();
+		g_no_usb = true;
+	}
+}
 
 /**
  * @brief Application specific setup functions
@@ -46,12 +64,6 @@ bool rgb_on = true;
  */
 void setup_app(void)
 {
-	const nrfx_power_config_t pwr_cfg = {0};
-	nrfx_power_init(&pwr_cfg);
-
-#if MY_DEBUG > 0
-	Serial1.begin(115200);
-#endif
 	// Initialize Serial for debug output
 	Serial.begin(115200);
 	// delay(5000);
@@ -70,33 +82,17 @@ void setup_app(void)
 		}
 	}
 
-	// Enable PM and EPD power
-	pinMode(EPD_POWER, OUTPUT);
-	digitalWrite(EPD_POWER, HIGH);
-
-	// CO2 & PM POWER
-	pinMode(CO2_PM_POWER, OUTPUT);
-	digitalWrite(CO2_PM_POWER, HIGH);
-
-	// VOC POWER
-	pinMode(VOC_POWER, OUTPUT);
-	digitalWrite(VOC_POWER, HIGH);
-
-#if HAS_EPD > 0
-	MYLOG("APP", "Init RAK14000");
-	init_rak14000();
-#endif
-
-	delay(500);
-	// Scan the I2C interfaces for devices
-	find_modules();
-
-	// Initialize RGB LED
-	init_rgb();
-	set_rgb_color(246, 190, 0); //
-
-	// Initialize the User AT command list
-	init_user_at();
+	// Check if a device is connected on USB
+	if (tud_cdc_connected())
+	{
+		MYLOG("APP", "Device connection detected");
+	}
+	else
+	{
+		MYLOG("APP", "No device connection detected");
+		g_no_usb = true;
+		Serial.end();
+	}
 
 	// Enable BLE
 	g_enable_ble = true;
@@ -114,13 +110,47 @@ bool init_app(void)
 
 	api_set_version(SW_VERSION_1, SW_VERSION_2, SW_VERSION_3);
 
-	AT_PRINTF("============================");
+	AT_PRINTF("===============================================");
 	AT_PRINTF("Air Quality Sensor");
 	AT_PRINTF("Built with RAK's WisBlock");
 	AT_PRINTF("SW Version %d.%d.%d", g_sw_ver_1, g_sw_ver_2, g_sw_ver_3);
-	AT_PRINTF("LoRa(R) is a registered trademark or service mark of Semtech Corporation or its affiliates.\nLoRaWAN(R) is a licensed mark.");
-	AT_PRINTF("============================\n");
-	// api_log_settings();
+	AT_PRINTF("LoRa(R) is a registered trademark or service\nmark of Semtech Corporation or its affiliates.\nLoRaWAN(R) is a licensed mark.");
+	AT_PRINTF("===============================================\n");
+
+	// Enable EPD and I2C power
+	pinMode(EPD_POWER, OUTPUT);
+	digitalWrite(EPD_POWER, HIGH);
+
+	// Start I2C
+	Wire.begin();
+
+#if HAS_EPD > 0
+	MYLOG("APP", "Init RAK14000");
+	init_rak14000();
+#endif
+
+	// CO2 & PM POWER
+	pinMode(CO2_PM_POWER, OUTPUT);
+	digitalWrite(CO2_PM_POWER, HIGH);
+
+	// VOC POWER
+	pinMode(VOC_POWER, OUTPUT);
+	digitalWrite(VOC_POWER, HIGH);
+
+	// PIR POWER
+	pinMode(PIR_POWER, OUTPUT);
+	digitalWrite(PIR_POWER, HIGH);
+
+	delay(500);
+	// Scan the I2C interfaces for devices
+	find_modules();
+
+	// Initialize RGB LED
+	init_rgb();
+	set_rgb_color(246, 190, 0); //
+
+	// Initialize the User AT command list
+	init_user_at();
 
 	// Announce found modules with +EVT: over Serial
 	announce_modules();
@@ -142,9 +172,10 @@ bool init_app(void)
 	MYLOG("APP", "Battery level is %.3f", batt_val);
 	g_is_using_battery = batt_val < 1000.0 ? false : true;
 
-#ifndef USE_BATTERY
-	/// \todo should not be required if battery reading would work
-	g_using_battery = false;
+#if FORCE_PWR_SRC == 1
+	g_is_using_battery = false;
+#elif FORCE_PWR_SRC == 2
+	g_is_using_battery = true;
 #endif
 
 	// If on battery usage, start timer to
@@ -154,13 +185,38 @@ bool init_app(void)
 		rgb_toggle.begin(15000, do_rgb_toggle, NULL, false);
 		rgb_toggle.start();
 	}
-
+	else
+	{
+		MYLOG("APP", "Device is external powered!");
+	}
 	// Prepare timer to send after the sensors were awake for 30 seconds
 	delayed_sending.begin(30000, send_delayed, NULL, false);
 
+	// If using LoRa P2P, there is no need to wait for the device to join
 	if (!g_lorawan_settings.lorawan_enable)
 	{
 		api_wake_loop(STATUS);
+		MYLOG("APP", "LoRa P2P => wake up loop");
+	}
+	else
+	{
+		// Check if auto join is disabled for LoRaWAN
+		if (!g_lorawan_settings.auto_join)
+		{
+			api_wake_loop(STATUS);
+			MYLOG("APP", "LoRaWAN autojoin disabled");
+		}
+
+		// Check if the send interval is enabled
+		if (g_lorawan_settings.send_repeat_time == 0)
+		{
+			// Enable a 5 minutes send interval to get some data on the screen
+			// even if there is no send interval defined
+			g_lorawan_settings.send_repeat_time = 300000;
+			api_timer_restart(g_lorawan_settings.send_repeat_time);
+			api_wake_loop(STATUS);
+			MYLOG("APP", "LoRaWAN send interval is 0");
+		}
 	}
 	return true;
 }
@@ -172,33 +228,45 @@ bool init_app(void)
  */
 void app_event_handler(void)
 {
+	digitalWrite(EPD_POWER, HIGH);
+
+	// Handle Reset request
+	if ((g_task_event_type & RST_REQ) == RST_REQ)
+	{
+		g_task_event_type &= N_RST_REQ;
+		// if (g_epd_off)
+		// {
+		// 	MYLOG("BTN", "EPD was off");
+		// startup_rak14000();
+		// }
+		rak14000_start_screen(false);
+		delay(3000);
+		api_reset();
+	}
+
+	// Handle Display updates
+	if ((g_task_event_type & DISP_UPDATE) == DISP_UPDATE)
+	{
+		g_task_event_type &= N_DISP_UPDATE;
+		MYLOG("APP", "Switch display UI");
+
+		refresh_rak14000();
+
+		// Screen update takes time, put a delay here
+		delay(2000);
+		if (g_ui_selected == 2)
+		{
+			g_ui_selected = g_ui_last;
+		}
+	}
+
 	// Toggle RGB visibility
 	if ((g_task_event_type & LED_REQ) == LED_REQ)
 	{
 		g_task_event_type &= N_LED_REQ;
 		MYLOG("APP", "RGB toggle every 15 seconds");
 
-		// if (rgb_on)
-		// {
 		set_rgb_color(0, 0, 0);
-		rgb_on = false;
-		// }
-		// else
-		// {
-		// 	if (g_air_status == 0)
-		// 	{
-		// 		set_rgb_color(0, 0, 128);
-		// 	}
-		// 	else if (g_air_status == 128)
-		// 	{
-		// 		set_rgb_color(128, 128, 0);
-		// 	}
-		// 	else
-		// 	{
-		// 		set_rgb_color(128, 0, 0);
-		// 	}
-		// 	rgb_on = true;
-		// }
 	}
 
 	// Unoccupied event
@@ -206,7 +274,6 @@ void app_event_handler(void)
 	{
 		g_task_event_type &= N_ROOM_EMPTY;
 		MYLOG("APP", "Room is not occupied, start power savings");
-		api_timer_restart(g_lorawan_settings.send_repeat_time * 2);
 		set_rgb_color(0, 0, 0);
 	}
 
@@ -215,7 +282,6 @@ void app_event_handler(void)
 	{
 		g_task_event_type &= N_MOTION_TRIGGER;
 		MYLOG("APP", "Room is occupied, stop power savings");
-		api_timer_restart(g_lorawan_settings.send_repeat_time);
 		if (g_air_status == 0)
 		{
 			set_rgb_color(0, 0, 128);
@@ -238,24 +304,23 @@ void app_event_handler(void)
 	if ((g_task_event_type & STATUS) == STATUS)
 	{
 		g_task_event_type &= N_STATUS;
-#ifdef SENSOR_SHUT_DOWN
-		MYLOG("APP", "Wake-up, power up sensors");
-		power_modules(true);
-		delayed_sending.start();
+		if (!g_is_using_battery)
+		{
+			g_task_event_type |= SEND_NOW;
+		}
+		else
+		{
+			MYLOG("APP", "Wake-up, power up sensors");
+			power_modules(true);
+			delayed_sending.start();
+		}
 	}
 
 	// Timer triggered event
 	if ((g_task_event_type & SEND_NOW) == SEND_NOW)
 	{
 		g_task_event_type &= N_SEND_NOW;
-#endif
 		MYLOG("APP", "Start reading and sending");
-
-		// // If BLE is enabled, restart Advertising
-		// if (g_enable_ble)
-		// {
-		// 	restart_advertising(15);
-		// }
 
 		// Reset the packet
 		g_solution_data.reset();
@@ -263,15 +328,23 @@ void app_event_handler(void)
 		// Get values from the connected modules
 		get_sensor_values();
 
-		// Get battery level
-		float batt_level_f = read_batt();
-		g_solution_data.addVoltage(LPP_CHANNEL_BATT, batt_level_f / 1000.0);
-
+		if (g_is_using_battery)
+		{
+			// Get battery level
+			float batt_level_f = read_batt();
+			g_solution_data.addVoltage(LPP_CHANNEL_BATT, batt_level_f / 1000.0);
+		}
 		// Add occupation information
 		g_solution_data.addPresence(LPP_CHANNEL_SWITCH, g_occupied);
 
+#if HAS_EPD > 0
+		// Refresh display
+		MYLOG("APP", "Refresh RAK14000");
+		refresh_rak14000();
+#endif
+
 		MYLOG("APP", "Packetsize %d", g_solution_data.getSize());
-		bool refresh_without_send = true;
+
 		if (g_lorawan_settings.lorawan_enable)
 		{
 			if (g_lpwan_has_joined)
@@ -281,7 +354,6 @@ void app_event_handler(void)
 				{
 				case LMH_SUCCESS:
 					MYLOG("APP", "Packet enqueued");
-					refresh_without_send = false;
 					break;
 				case LMH_BUSY:
 					MYLOG("APP", "LoRa transceiver is busy");
@@ -296,6 +368,7 @@ void app_event_handler(void)
 		}
 		else
 		{
+			// Add the device DevEUI as a device ID to the packet
 			uint8_t packet_buffer[g_solution_data.getSize() + 8];
 			memcpy(packet_buffer, g_lorawan_settings.node_device_eui, 8);
 			memcpy(&packet_buffer[8], g_solution_data.getBuffer(), g_solution_data.getSize());
@@ -304,7 +377,6 @@ void app_event_handler(void)
 			if (send_p2p_packet(packet_buffer, g_solution_data.getSize() + 8))
 			{
 				MYLOG("APP", "Packet enqueued");
-				refresh_without_send = false;
 			}
 			else
 			{
@@ -315,25 +387,30 @@ void app_event_handler(void)
 		// Reset the packet
 		g_solution_data.reset();
 
-#if HAS_EPD > 0
-		if (refresh_without_send)
+		// Check if room is occupied
+		if (g_occupied)
 		{
-			// Refresh display
-			MYLOG("APP", "Refresh RAK14000");
-			wake_rak14000();
+			// Occupied, use default update time
+			api_timer_restart(g_lorawan_settings.send_repeat_time);
 		}
-#endif
-#ifdef SENSOR_SHUT_DOWN
-		// Power down the modules
-		power_modules(false);
-#endif
+		else
+		{
+			// Not occupied, double the update time
+			api_timer_restart(g_lorawan_settings.send_repeat_time * 2);
+		}
+
+		if (g_is_using_battery)
+		{
+			// Power down the modules
+			power_modules(false);
+		}
 	}
 
 	// VOC read request event
 	if ((g_task_event_type & VOC_REQ) == VOC_REQ)
 	{
 		g_task_event_type &= N_VOC_REQ;
-
+		MYLOG("APP", "Handle VOC");
 		do_read_rak12047();
 	}
 
@@ -350,6 +427,8 @@ void app_event_handler(void)
 		do_read_rak1906_bsec();
 #endif
 	}
+
+	digitalWrite(EPD_POWER, LOW);
 }
 
 /**
@@ -395,6 +474,9 @@ void lora_data_handler(void)
 
 			// Reset join failed counter
 			join_send_fail = 0;
+
+			// Start a sensor reading
+			api_wake_loop(STATUS);
 		}
 		else
 		{
@@ -403,24 +485,16 @@ void lora_data_handler(void)
 			/// \todo here join could be restarted.
 			lmh_join();
 
-			// // If BLE is enabled, restart Advertising
-			// if (g_enable_ble)
-			// {
-			// 	restart_advertising(15);
-			// }
-
-			/// \todo implement for final version only
 			join_send_fail++;
 			if (join_send_fail == 10)
 			{
-				// // Too many failed join requests, reset node and try to rejoin
-				// delay(100);
-				// api_reset();
+				// Too many failed join requests, reset node and try to rejoin
+				delay(100);
+				api_reset();
 			}
 		}
-		if (join_send_fail < 2)
+		if ((join_send_fail < 2) && !g_join_result)
 		{
-			// Force a sensor reading
 			// Force a sensor reading
 			api_wake_loop(STATUS);
 		}
@@ -431,11 +505,11 @@ void lora_data_handler(void)
 	{
 		g_task_event_type &= N_LORA_TX_FIN;
 
-#if HAS_EPD > 0
-		// Refresh display
-		MYLOG("APP", "Refresh RAK14000");
-		wake_rak14000();
-#endif
+		// #if HAS_EPD > 0
+		// 		// Refresh display
+		// 		MYLOG("APP", "Refresh RAK14000");
+		// 		api_wake_loop(DISP_UPDATE);
+		// #endif
 		MYLOG("APP", "LoRa TX cycle %s", g_rx_fin_result ? "finished ACK" : "failed NAK");
 
 		if ((g_lorawan_settings.confirmed_msg_enabled) && (g_lorawan_settings.lorawan_enable))
@@ -457,12 +531,11 @@ void lora_data_handler(void)
 			// Increase fail send counter
 			join_send_fail++;
 
-			/// \todo implement for final version only
 			if (join_send_fail == 10)
 			{
-				// // Too many failed sendings, reset node and try to rejoin
-				// delay(100);
-				// api_reset();
+				// Too many failed sendings, reset node and try to rejoin
+				delay(100);
+				api_reset();
 			}
 		}
 	}
@@ -472,33 +545,21 @@ void lora_data_handler(void)
 	{
 		g_task_event_type &= N_LORA_DATA;
 		MYLOG("APP", "Received package over LoRa");
-		// Check if uplink was a send frequency change command
-		if ((g_last_fport == 3) && (g_rx_data_len == 6))
-		{
-			if (g_rx_lora_data[0] == 0xAA)
-			{
-				if (g_rx_lora_data[1] == 0x55)
-				{
-					uint32_t new_send_frequency = 0;
-					new_send_frequency |= (uint32_t)(g_rx_lora_data[2]) << 24;
-					new_send_frequency |= (uint32_t)(g_rx_lora_data[3]) << 16;
-					new_send_frequency |= (uint32_t)(g_rx_lora_data[4]) << 8;
-					new_send_frequency |= (uint32_t)(g_rx_lora_data[5]);
-
-					MYLOG("APP", "Received new send frequency %ld s\n", new_send_frequency);
-					// Save the new send frequency
-					g_lorawan_settings.send_repeat_time = new_send_frequency * 1000;
-
-					// Set the timer to the new send frequency
-					api_timer_restart(g_lorawan_settings.send_repeat_time);
-					// Save the new send frequency
-					save_settings();
-				}
-			}
-		}
 
 		if (g_lorawan_settings.lorawan_enable)
 		{
+			// Check if uplink was a send frequency change command
+			if ((g_last_fport == 3) && (g_rx_data_len == 6))
+			{
+				if (g_rx_lora_data[0] == 0xAA)
+				{
+					if (g_rx_lora_data[1] == 0x55)
+					{
+						change_sendinterval();
+					}
+				}
+			}
+
 			char rx_msg[512] = {0};
 			int len = sprintf(rx_msg, "+EVT:RX_1:%d:%d:UNICAST:%d:", g_last_rssi, g_last_snr, g_last_fport);
 			for (int idx = 0; idx < g_rx_data_len; idx++)
@@ -510,6 +571,18 @@ void lora_data_handler(void)
 		}
 		else
 		{
+			// Check if uplink was a send frequency change command
+			if (g_rx_data_len == 6)
+			{
+				if (g_rx_lora_data[0] == 0xAA)
+				{
+					if (g_rx_lora_data[1] == 0x55)
+					{
+						change_sendinterval();
+					}
+				}
+			}
+
 			char rx_msg[512] = {0};
 			int len = sprintf(rx_msg, "+EVT:RXP2P:%d:%d:", g_last_rssi, g_last_snr);
 			for (int idx = 0; idx < g_rx_data_len; idx++)
@@ -543,4 +616,26 @@ void send_delayed(TimerHandle_t unused)
 void do_rgb_toggle(TimerHandle_t unused)
 {
 	api_wake_loop(LED_REQ);
+}
+
+/**
+ * @brief Change the send interval and restart the timer
+ *
+ */
+void change_sendinterval(void)
+{
+	uint32_t new_send_frequency = 0;
+	new_send_frequency |= (uint32_t)(g_rx_lora_data[2]) << 24;
+	new_send_frequency |= (uint32_t)(g_rx_lora_data[3]) << 16;
+	new_send_frequency |= (uint32_t)(g_rx_lora_data[4]) << 8;
+	new_send_frequency |= (uint32_t)(g_rx_lora_data[5]);
+
+	MYLOG("APP", "Received new send frequency %ld s\n", new_send_frequency);
+	// Save the new send frequency
+	g_lorawan_settings.send_repeat_time = new_send_frequency * 1000;
+
+	// Set the timer to the new send frequency
+	api_timer_restart(g_lorawan_settings.send_repeat_time);
+	// Save the new send frequency
+	save_settings();
 }

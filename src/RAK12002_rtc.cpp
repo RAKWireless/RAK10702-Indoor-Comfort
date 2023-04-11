@@ -41,6 +41,11 @@ bool init_rak12002(void)
 	g_date_time.minute = rtc.getMinute();
 	g_date_time.second = rtc.getSecond();
 
+	if ((g_date_time.year == 2165) && (g_date_time.month == 165) && (g_date_time.date == 165))
+	{
+		MYLOG("RTC", "Returned values make no sense, no RTC attached");
+		return false;
+	}
 	MYLOG("RTC", "%d.%02d.%02d %d:%02d:%02d", g_date_time.year, g_date_time.month, g_date_time.date, g_date_time.hour, g_date_time.minute, g_date_time.second);
 	return true;
 }

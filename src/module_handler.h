@@ -13,10 +13,6 @@
 #ifndef MODULE_HANDLER_H
 #define MODULE_HANDLER_H
 
-extern SoftwareTimer delayed_sending;
-void send_delayed(TimerHandle_t unused);
-void do_rgb_toggle(TimerHandle_t unused);
-
 /** Wakeup triggers for application events */
 #define MOTION_TRIGGER 0b1000000000000000
 #define N_MOTION_TRIGGER 0b0111111111111111
@@ -30,6 +26,10 @@ void do_rgb_toggle(TimerHandle_t unused);
 #define N_LED_REQ 0b1111011111111111
 #define BSEC_REQ 0b0000010000000000
 #define N_BSEC_REQ 0b1111101111111111
+#define DISP_UPDATE 0b0000001000000000
+#define N_DISP_UPDATE 0b1111110111111111
+#define RST_REQ   0b0000000100000000
+#define N_RST_REQ 0b1111111011111111
 
 typedef struct sensors_s
 {
@@ -145,7 +145,7 @@ void read_rak12002(void);
 bool init_rak12010(void);
 void read_rak12010();
 bool init_rak12019(void);
-void read_rak12019();
+void read_rak12019(void);
 bool init_rak12037(void);
 void read_rak12037(void);
 bool init_rak12039(void);
@@ -180,9 +180,10 @@ void pm_rak14000(void);
 void status_ui_rak14000(void);
 void rak14000_start_screen(bool startup = true);
 void rak14000_switch_bg(void);
-void startup_rak14000(void);
 void switch_ui(void);
-extern bool g_epd_off;
+extern volatile bool g_epd_off;
+extern uint8_t g_ui_selected;
+extern uint8_t g_ui_last;
 
 // Sensor power functions
 void power_modules(bool switch_on);

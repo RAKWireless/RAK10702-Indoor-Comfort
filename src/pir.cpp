@@ -59,34 +59,11 @@ void init_pir(void)
 
 	pinMode(PIR_INT, INPUT);
 
-#ifndef SENSOR_SHUT_DOWN
 	// PIR INTERRPUT
 	attachInterrupt(PIR_INT, pir_int, RISING);
-#endif
 
 	// Start timer for occupation detection (10 minutes)
 	occupation_timer.begin(10 * 60 * 1000, occupation_timeout, NULL, false);
 	// occupation_timer.begin(30 * 1000, occupation_timeout, NULL, false);
 	occupation_timer.start();
-}
-
-/**
- * @brief Power up PIR sensor 
- * 		used when sensor shutdown is enabled
- * 
- */
-void startup_pir(void)
-{
-	digitalWrite(PIR_POWER, HIGH);
-	delay(100);
-	attachInterrupt(PIR_INT, pir_int, RISING);
-}
-
-/**
- * @brief Shutdown power of the PIR sensor
- * 
- */
-void shut_down_pir(void)
-{
-	digitalWrite(PIR_POWER, LOW);
 }

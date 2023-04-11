@@ -350,32 +350,27 @@ void pm_rak14000(void)
 	s_text = 2;
 
 	// Write value
-	display.drawBitmap(x_text, y_text, pm_img, 32, 32, txt_color);
-
-	snprintf(disp_text, 29, "PM");
-	text_rak14000(x_text + 40, y_text + 20, disp_text, txt_color, s_text);
+	uint8_t pm_value_warning = 0;
 
 	// PM 1.0 levels
 	if (pm10_values[pm_idx - 1] > 75)
 	{
-		snprintf(disp_text, 29, "1.0: !!");
 		if (g_air_status < 255)
 		{
 			g_air_status = 255;
+			pm_value_warning = 255;
 		}
 	}
 	else if (pm10_values[pm_idx - 1] > 35)
 	{
-		snprintf(disp_text, 29, "1.0: !");
 		if (g_air_status < 128)
 		{
 			g_air_status = 128;
+			pm_value_warning = 128;
 		}
 	}
-	else
-	{
-		snprintf(disp_text, 29, "1.0:");
-	}
+
+	snprintf(disp_text, 29, "1.0:");
 	text_rak14000(x_text, y_text + 60, disp_text, txt_color, s_text);
 
 	snprintf(disp_text, 29, "%d", pm10_values[pm_idx - 1]);
@@ -389,24 +384,22 @@ void pm_rak14000(void)
 	// PM 2.5 levels
 	if (pm25_values[pm_idx - 1] > 75)
 	{
-		snprintf(disp_text, 29, "2.5: !!");
 		if (g_air_status < 255)
 		{
 			g_air_status = 255;
+			pm_value_warning = 255;
 		}
 	}
 	else if (pm25_values[pm_idx - 1] > 35)
 	{
-		snprintf(disp_text, 29, "2.5: !");
 		if (g_air_status < 128)
 		{
 			g_air_status = 128;
+			pm_value_warning = 255;
 		}
 	}
-	else
-	{
-		snprintf(disp_text, 29, "2.5:");
-	}
+
+	snprintf(disp_text, 29, "2.5:");
 	text_rak14000(x_text, y_text + 120, disp_text, txt_color, s_text);
 
 	snprintf(disp_text, 29, "%d", pm25_values[pm_idx - 1]);
@@ -420,24 +413,22 @@ void pm_rak14000(void)
 	// PM 10 levels
 	if (pm100_values[pm_idx - 1] > 199)
 	{
-		snprintf(disp_text, 29, "10: !!");
 		if (g_air_status < 255)
 		{
 			g_air_status = 255;
+			pm_value_warning = 255;
 		}
 	}
 	else if (pm100_values[pm_idx - 1] > 150)
 	{
-		snprintf(disp_text, 29, "10: !");
 		if (g_air_status < 128)
 		{
 			g_air_status = 128;
+			pm_value_warning = 128;
 		}
 	}
-	else
-	{
-		snprintf(disp_text, 29, "10:");
-	}
+
+	snprintf(disp_text, 29, "10:");
 	text_rak14000(x_text, y_text + 180, disp_text, txt_color, s_text);
 
 	snprintf(disp_text, 29, "%d", pm100_values[pm_idx - 1]);
@@ -447,6 +438,22 @@ void pm_rak14000(void)
 	text_rak14000(display_width - txt_w - 45, y_text + 180, disp_text, txt_color, s_text);
 	snprintf(disp_text, 29, "%cg/m%c", 0x7F, 0x80);
 	text_rak14000(display_width - 38, y_text + 185, disp_text, txt_color, 1);
+
+	display.drawBitmap(x_text, y_text, pm_img, 32, 32, txt_color);
+
+	if (pm_value_warning == 255)
+	{
+		snprintf(disp_text, 29, "PM !!");
+	}
+	else if (pm_value_warning == 128)
+	{
+		snprintf(disp_text, 29, "PM !");
+	}
+	else
+	{
+		snprintf(disp_text, 29, "PM");
+	}
+	text_rak14000(x_text + 40, y_text + 20, disp_text, txt_color, s_text);
 }
 
 /**

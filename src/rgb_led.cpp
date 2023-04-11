@@ -14,15 +14,23 @@
 /** RGB LED instance */
 NCP5623 rgb;
 
+/** Flag if RGB LED driver was found */
+bool g_has_rgb = false;
 /**
  * @brief Initialize the RGB driver 
  * 
  */
 void init_rgb(void)
 {
-	rgb.begin();
+	g_has_rgb = rgb.begin();
+	if (!g_has_rgb)
+	{
+		MYLOG("RGB", "RGB not found");
+		return;
+	}
 	rgb.setCurrent(1);
 	rgb.setColor(255, 255, 0); // Yellow
+	AT_PRINTF("+EVT:RGB OK")
 }
 
 /**
@@ -34,6 +42,17 @@ void init_rgb(void)
  */
 void set_rgb_color(uint8_t red, uint8_t green, uint8_t blue)
 {
+	if (!g_has_rgb)
+	{
+		return;
+	}
+	
+	if (g_is_using_battery)
+	{
+		MYLOG("RGB", "I2C might be off, switching power on");
+	}
+	digitalWrite(EPD_POWER, HIGH);
+	delay(250);
 	// If room is empty, switch off the LED's
 	if (!g_occupied)
 	{

@@ -18,12 +18,6 @@ RAK_PMSA003I PMSA003I;
 /** Data structure */
 PMSA_Data_t data;
 
-/*
- * @brief WB_IO6 is connected to the SET pin.
- *        Set pin/TTL level @3.3V, high level or suspending is normal working status.
- *        while low level is sleeping mode.
- */
-
 /**
  * @brief Initialize the PMSA003I sensor
  *
@@ -39,32 +33,44 @@ bool init_rak12039(void)
 	digitalWrite(SET_PIN, HIGH);
 
 	// Wait for sensor wake-up
-	delay(300);
+	time_t wait_sensor = millis();
+	MYLOG("PMS", "RAK12039 scan start %ld ms", millis());
+	byte error;
+	while (1)
+	{
+		delay(500);
+		Wire.beginTransmission(0x12);
+		error = Wire.endTransmission();
+		if (error == 0)
+		{
+			MYLOG("PMS", "RAK12039 answered at %ld ms", millis());
+			break;
+		}
+		if ((millis() - wait_sensor) > 10000)
+		{
+			MYLOG("PMS", "RAK12039 timeout after 10000 ms");
+			return false;
+		}
+	}
+
 	if (!PMSA003I.begin())
 	{
-		MYLOG("Dust", "PMSA003I begin fail,please check connection!");
+		MYLOG("PMS", "PMSA003I begin fail,please check connection!");
 		digitalWrite(SET_PIN, LOW);
 		return false;
 	}
 
-	// digitalWrite(SET_PIN, LOW);
 	return true;
 }
 
 /**
- * @brief Read ToF data from VL53L01
+ * @brief Read PM data from RAK12039
  *     Data is added to Cayenne LPP payload as channels
- *     LPP_CHANNEL_TOF
+ *     LPP_CHANNEL_PM_1_0, LPP_CHANNEL_PM_2_5, LPP_CHANNEL_PM_10_0
  *
  */
 void read_rak12039(void)
 {
-	// RAK12039 supports only low I2C speed
-	Wire.setClock(100000);
-	// Sensor on
-	// digitalWrite(SET_PIN, HIGH);
-	delay(300);
-
 	if (PMSA003I.readDate(&data))
 	{
 
@@ -85,10 +91,6 @@ void read_rak12039(void)
 		Serial.println("PMSA003I read failed!");
 	}
 
-	// RAK12039 supports only low I2C speed
-	Wire.setClock(100000); // Wire.setClock(400000);
-	// Sensor off
-	// digitalWrite(SET_PIN, LOW);
 	return;
 }
 
