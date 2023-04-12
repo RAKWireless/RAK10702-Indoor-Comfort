@@ -184,7 +184,7 @@ void clear_rak14000(void)
 void switch_ui(void)
 {
 	g_ui_selected += 1;
-	if (g_ui_selected == 2)
+	if (g_ui_selected >= 2)
 	{
 		g_ui_selected = 0;
 	}

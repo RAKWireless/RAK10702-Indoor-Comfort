@@ -45,14 +45,11 @@
 #define MYLOG(tag, ...)                     \
 	do                                      \
 	{                                       \
-		if (!g_no_usb)                      \
-		{                                   \
-			if (tag)                        \
-				PRINTF("[%s] ", tag);       \
-			PRINTF(__VA_ARGS__);            \
-			PRINTF("\n");                   \
-			Serial.flush();                 \
-		}                                   \
+		if (tag)                            \
+			PRINTF("[%s] ", tag);           \
+		PRINTF(__VA_ARGS__);                \
+		PRINTF("\n");                       \
+		Serial.flush();                     \
 		if (g_ble_uart_is_connected)        \
 		{                                   \
 			g_ble_uart.printf(__VA_ARGS__); \
@@ -76,7 +73,7 @@ void send_delayed(TimerHandle_t unused);
 void do_rgb_toggle(TimerHandle_t unused);
 
 extern uint8_t g_last_fport;
-extern bool g_no_usb;
+// extern bool g_no_usb;
 
 /** Module stuff */
 #include "module_handler.h"

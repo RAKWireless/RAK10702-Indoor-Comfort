@@ -31,7 +31,7 @@ uint8_t join_send_fail = 0;
 WisCayenne g_solution_data(255);
 
 /** Flag if a USB device is connected */
-bool g_no_usb = false;
+// bool g_no_usb = false;
 
 /** Flag if the device is battery or permanent powered */
 bool g_is_using_battery = false;
@@ -49,12 +49,12 @@ void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
 	if (dtr)
 	{
 		Serial.begin(115200);
-		g_no_usb = false;
+		// g_no_usb = false;
 	}
 	else
 	{
 		Serial.end();
-		g_no_usb = true;
+		// g_no_usb = true;
 	}
 }
 
@@ -90,7 +90,7 @@ void setup_app(void)
 	else
 	{
 		MYLOG("APP", "No device connection detected");
-		g_no_usb = true;
+		// g_no_usb = true;
 		Serial.end();
 	}
 

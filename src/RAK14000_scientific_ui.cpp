@@ -358,16 +358,16 @@ void pm_rak14000(void)
 		if (g_air_status < 255)
 		{
 			g_air_status = 255;
-			pm_value_warning = 255;
 		}
+		pm_value_warning = 255;
 	}
 	else if (pm10_values[pm_idx - 1] > 35)
 	{
 		if (g_air_status < 128)
 		{
 			g_air_status = 128;
-			pm_value_warning = 128;
 		}
+		pm_value_warning = 128;
 	}
 
 	snprintf(disp_text, 29, "1.0:");
@@ -387,16 +387,16 @@ void pm_rak14000(void)
 		if (g_air_status < 255)
 		{
 			g_air_status = 255;
-			pm_value_warning = 255;
 		}
+		pm_value_warning = 255;
 	}
 	else if (pm25_values[pm_idx - 1] > 35)
 	{
 		if (g_air_status < 128)
 		{
 			g_air_status = 128;
-			pm_value_warning = 255;
 		}
+		pm_value_warning = 255;
 	}
 
 	snprintf(disp_text, 29, "2.5:");
@@ -416,16 +416,16 @@ void pm_rak14000(void)
 		if (g_air_status < 255)
 		{
 			g_air_status = 255;
-			pm_value_warning = 255;
 		}
+		pm_value_warning = 255;
 	}
 	else if (pm100_values[pm_idx - 1] > 150)
 	{
 		if (g_air_status < 128)
 		{
 			g_air_status = 128;
-			pm_value_warning = 128;
 		}
+		pm_value_warning = 128;
 	}
 
 	snprintf(disp_text, 29, "10:");
