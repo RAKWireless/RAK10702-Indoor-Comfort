@@ -58,11 +58,11 @@ void read_rak1903()
 	OPT3001 result = opt3001.readResult();
 	if (result.error == NO_ERROR)
 	{
-		uint16_t light_int = (uint16_t)(result.lux);
+		last_light_lux = result.lux;
 
-		MYLOG("LIGHT", "L: %.2f", (float)light_int / 1.0);
+		MYLOG("LIGHT", "L: %.2f", last_light_lux);
 
-		g_solution_data.addLuminosity(LPP_CHANNEL_LIGHT, (uint32_t)(light_int));
+		g_solution_data.addLuminosity(LPP_CHANNEL_LIGHT, (uint32_t)(last_light_lux));
 	}
 	else
 	{

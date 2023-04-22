@@ -154,6 +154,7 @@ bool init_rak12047(void);
 void read_rak12047(void);
 void do_read_rak12047(void);
 extern volatile bool g_voc_is_active;
+extern float last_light_lux;
 
 void find_modules(void);
 void announce_modules(void);
@@ -226,8 +227,11 @@ void check_button(void);
 #define TASK_PRIO_LOW 1
 #endif
 
+// AT command read and save functions
 void read_batt_settings(void);
 void save_batt_settings(bool check_batt_enables);
+void read_ui_settings(void);
+void save_ui_settings(uint8_t ui_selected);
 
 #define VOC_POWER 20	// PIN_SERIAL2_TX
 #define PIR_POWER 2		// PIN_AREF

@@ -103,17 +103,6 @@ void multiClick()
 		g_ui_selected = 2;
 		api_wake_loop(DISP_UPDATE);
 		break;
-	// Only for testing, shut down everything
-	case 5:
-		// Stop everything
-		MYLOG("BTN", "Stopping everything.");
-		api_timer_stop();
-		digitalWrite(EPD_POWER, LOW);
-		digitalWrite(PIR_POWER, LOW);
-		digitalWrite(CO2_PM_POWER, LOW);
-		voc_read_timer.stop();
-		digitalWrite(VOC_POWER, LOW);
-		break;
 		// Reset the device
 	case 9:
 			MYLOG("BTN", "RST request");

@@ -26,10 +26,10 @@ bool init_rak12002(void)
 {
 	rtc.initI2C(Wire);
 
-	rtc.useEEPROM(false);
-
 	rtc.writeToRegister(0x35, 0x00);
 	rtc.writeToRegister(0x37, 0xB4); // Direct Switching Mode (DSM): when VDD < VBACKUP, switchover occurs from VDD to VBACKUP
+
+	rtc.useEEPROM(false);
 
 	rtc.set24HourMode(); // Set the device to use the 24hour format (default) instead of the 12 hour format
 
@@ -62,6 +62,7 @@ bool init_rak12002(void)
 void set_rak12002(uint16_t year, uint8_t month, uint8_t date, uint8_t hour, uint8_t minute)
 {
 	digitalWrite(EPD_POWER, HIGH);
+	Wire.begin();
 	uint8_t weekday = (date + (uint16_t)((2.6 * month) - 0.2) - (2 * (year / 100)) + year + (uint16_t)(year / 4) + (uint16_t)(year / 400)) % 7;
 	MYLOG("RTC", "Calculated weekday is %d", weekday);
 	rtc.setTime(year, month, weekday, date, hour, minute, 0);

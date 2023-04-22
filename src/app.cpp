@@ -36,27 +36,8 @@ WisCayenne g_solution_data(255);
 /** Flag if the device is battery or permanent powered */
 bool g_is_using_battery = false;
 
-// Callback if USB line status changes
-/**
- * @brief Callback if USB line status changes
- *
- * @param itf not used
- * @param dtr status of DTR line
- * @param rts status of RTS line
- */
-void tud_cdc_line_state_cb(uint8_t itf, bool dtr, bool rts)
-{
-	if (dtr)
-	{
-		Serial.begin(115200);
-		// g_no_usb = false;
-	}
-	else
-	{
-		Serial.end();
-		// g_no_usb = true;
-	}
-}
+volatile bool new_dtr = false;
+volatile bool new_rts = false;
 
 /**
  * @brief Application specific setup functions
@@ -80,18 +61,6 @@ void setup_app(void)
 		{
 			break;
 		}
-	}
-
-	// Check if a device is connected on USB
-	if (tud_cdc_connected())
-	{
-		MYLOG("APP", "Device connection detected");
-	}
-	else
-	{
-		MYLOG("APP", "No device connection detected");
-		// g_no_usb = true;
-		Serial.end();
 	}
 
 	// Enable BLE
@@ -120,9 +89,6 @@ bool init_app(void)
 	// Enable EPD and I2C power
 	pinMode(EPD_POWER, OUTPUT);
 	digitalWrite(EPD_POWER, HIGH);
-
-	// Start I2C
-	Wire.begin();
 
 #if HAS_EPD > 0
 	MYLOG("APP", "Init RAK14000");
@@ -178,11 +144,11 @@ bool init_app(void)
 	g_is_using_battery = true;
 #endif
 
-	// If on battery usage, start timer to
+	rgb_toggle.begin(15000, do_rgb_toggle, NULL, false);
+	// If on battery usage, start timer to switch off the RGB LED
 	if (g_is_using_battery)
 	{
 		MYLOG("APP", "Device is battery powered!");
-		rgb_toggle.begin(15000, do_rgb_toggle, NULL, false);
 		rgb_toggle.start();
 	}
 	else
@@ -218,8 +184,16 @@ bool init_app(void)
 			MYLOG("APP", "LoRaWAN send interval is 0");
 		}
 	}
+
+	digitalWrite(EPD_POWER, LOW);
+	Wire.end();
+	pinMode(WB_I2C1_SDA, INPUT);
+	pinMode(WB_I2C1_SCL, INPUT);
+	digitalWrite(CO2_PM_POWER, LOW);
 	return true;
 }
+
+bool switch_power_off = true;
 
 /**
  * @brief Application specific event handler
@@ -229,6 +203,7 @@ bool init_app(void)
 void app_event_handler(void)
 {
 	digitalWrite(EPD_POWER, HIGH);
+	Wire.begin();
 
 	// Handle Reset request
 	if ((g_task_event_type & RST_REQ) == RST_REQ)
@@ -304,9 +279,12 @@ void app_event_handler(void)
 	if ((g_task_event_type & STATUS) == STATUS)
 	{
 		g_task_event_type &= N_STATUS;
+
+		switch_power_off = false;
 		if (!g_is_using_battery)
 		{
 			g_task_event_type |= SEND_NOW;
+			power_modules(true);
 		}
 		else
 		{
@@ -320,6 +298,8 @@ void app_event_handler(void)
 	if ((g_task_event_type & SEND_NOW) == SEND_NOW)
 	{
 		g_task_event_type &= N_SEND_NOW;
+
+		switch_power_off = true;
 		MYLOG("APP", "Start reading and sending");
 
 		// Reset the packet
@@ -399,8 +379,9 @@ void app_event_handler(void)
 			api_timer_restart(g_lorawan_settings.send_repeat_time * 2);
 		}
 
-		if (g_is_using_battery)
+		// if (g_is_using_battery)
 		{
+			MYLOG("APP", ">>>> POWER OFF");
 			// Power down the modules
 			power_modules(false);
 		}
@@ -428,7 +409,13 @@ void app_event_handler(void)
 #endif
 	}
 
-	digitalWrite(EPD_POWER, LOW);
+	if (switch_power_off)
+	{
+		digitalWrite(EPD_POWER, LOW);
+		Wire.end();
+		pinMode(WB_I2C1_SDA, INPUT);
+		pinMode(WB_I2C1_SCL, INPUT);
+	}
 }
 
 /**

@@ -51,8 +51,6 @@ void set_rgb_color(uint8_t red, uint8_t green, uint8_t blue)
 	{
 		MYLOG("RGB", "I2C might be off, switching power on");
 	}
-	digitalWrite(EPD_POWER, HIGH);
-	delay(250);
 	// If room is empty, switch off the LED's
 	if (!g_occupied)
 	{

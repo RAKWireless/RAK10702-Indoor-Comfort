@@ -142,6 +142,10 @@ void find_modules(void)
 	{
 		found_sensors[LIGHT2_ID].found_sensor = false;
 	}
+	else
+	{
+		found_sensors[LIGHT2_ID].found_sensor = true;
+	}
 
 	if (!init_rak12019())
 	{
@@ -333,8 +337,6 @@ void power_modules(bool switch_on)
 	else
 	{
 		g_epd_off = false;
-		MYLOG("MOD", "I2C might be off, switching power on");
-		digitalWrite(EPD_POWER, HIGH);
 	}
 
 	if (found_sensors[TEMP_ID].found_sensor)

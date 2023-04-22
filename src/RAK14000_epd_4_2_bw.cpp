@@ -95,34 +95,15 @@ uint8_t g_ui_last = 0;
  */
 void init_rak14000(void)
 {
-	// if (g_is_using_battery)
-	// {
-	// 	MYLOG("EPD", "I2C might be off, switching power on");
-	// 	digitalWrite(EPD_POWER, HIGH);
-	// }
 	g_epd_off = false;
-
-	// // Create the EPD event semaphore
-	// g_epd_sem = xSemaphoreCreateBinary();
-	// // Initialize semaphore
-	// xSemaphoreGive(g_epd_sem);
-	// // Take semaphore
-	// xSemaphoreTake(g_epd_sem, 10);
-	// if (!xTaskCreate(epd_task, "EPD", 4096, NULL, TASK_PRIO_LOW, &epd_task_handle))
-	// {
-	// 	MYLOG("EPD", "Failed to start EPD task");
-	// }
-
-	// MYLOG("EPD", "Initialized 4.2\" display");
-
-	// // Prepare display off timer
-	// display_off.begin(10000, shut_down_rak14000, NULL, false);
 
 	display.begin();
 
 	display.setRotation(EPD_ROTATION); // 1 for Gavin 3 for mine
 	MYLOG("EPD", "Rotation %d", display.getRotation());
 
+	read_ui_settings();
+	
 	rak14000_start_screen();
 }
 
@@ -408,8 +389,8 @@ void rak14000_start_screen(bool startup)
 
 	display.setFont(LARGE_FONT);
 	display.setTextSize(1);
-	display.getTextBounds((char *)"RAK10702 Air Quality", 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-	text_rak14000(display_width / 2 - (txt_w / 2), 150, (char *)"RAK10702 Air Quality", (uint16_t)txt_color, 2);
+	display.getTextBounds((char *)"RAK10702 Indoor Comfort", 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
+	text_rak14000(display_width / 2 - (txt_w / 2), 150, (char *)"RAK10702 Indoor Comfort", (uint16_t)txt_color, 2);
 
 	display.drawBitmap(display_width / 2 - 63, 190, built_img, 126, 66, txt_color);
 
@@ -434,90 +415,6 @@ void rak14000_switch_bg(void)
 	txt_color = bg_color;
 	bg_color = old_txt;
 	api_wake_loop(DISP_UPDATE);
-
-	// xSemaphoreGive(g_epd_sem);
-	// delay(4000);
-}
-
-/**
- * @brief Task to update the display
- *
- * @param pvParameters unused
- */
-void epd_task(void *pvParameters)
-{
-	MYLOG("EPD", "EPD Task started");
-
-	display.begin();
-
-	display.setRotation(EPD_ROTATION); // 1 for Gavin 3 for mine
-	MYLOG("EPD", "Rotation %d", display.getRotation());
-
-	rak14000_start_screen();
-
-	// For partial update only
-	// uint16_t counter = 0;
-	while (1)
-	{
-		// For partial update only
-		// display.clearBuffer();
-		// display.setTextSize(4);
-		// display.setTextColor(EPD_BLACK);
-		// display.setCursor(32, 32);
-		// display.print((counter / 1000) % 10);
-		// display.print((counter / 100) % 10);
-		// display.print((counter / 10) % 10);
-		// display.print(counter % 10);
-
-		// if ((counter % 10) == 0)
-		// {
-		// 	MYLOG("EPD", "Full update");
-		// 	display.display(false);
-		// }
-		// else
-		// {
-		// 	MYLOG("EPD", "Partial update");
-		// 	// redraw only 4th digit
-		// 	display.displayPartial(32 + (24 * 3), 32, 32 + (24 * 4), 32 + (4 * 8));
-		// }
-
-		// MYLOG("EPD", "Counter = %d", counter);
-		// counter++;
-		// delay(5000);
-
-		if (xSemaphoreTake(g_epd_sem, portMAX_DELAY) == pdTRUE)
-		{
-			MYLOG("EPD", "Start update");
-			if (g_is_using_battery)
-			{
-				if (g_epd_off)
-				{
-					MYLOG("EPD", "EPD was off");
-					startup_rak14000();
-				}
-			}
-
-			refresh_rak14000();
-
-			if (g_is_using_battery)
-			{
-				if (g_voc_is_active)
-				{
-					MYLOG("EPD", "VOC is active, switch off in 10 seconds");
-					// Start timer to shut down EPD after 10 seconds (give time to refresh full screen)
-					display_off.start();
-					g_epd_off = true;
-				}
-				else
-				{
-					MYLOG("EPD", "VOC is not active, switch off now");
-					// Disable power
-					digitalWrite(EPD_POWER, LOW);
-					g_epd_off = true;
-				}
-			}
-		}
-	}
 }
 
 /**

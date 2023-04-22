@@ -17,4 +17,4 @@ version_tag_2 = defines.get("SW_VERSION_2")
 version_tag_3 = defines.get("SW_VERSION_3")
 build_date = datetime.datetime.now().strftime('%y.%m.%d_%H.%M')
 
-env.Replace(PROGNAME="../../../Debug-Build/WisBlock_IAQ_V%s.%s.%s_%s_dbg" % (version_tag_1,version_tag_2,version_tag_3,build_date))
+env.Replace(PROGNAME="../../../Debug-Build/WisBlock_Comfort_V%s.%s.%s_%s_dbg" % (version_tag_1,version_tag_2,version_tag_3,build_date))

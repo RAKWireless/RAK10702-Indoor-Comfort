@@ -22,7 +22,7 @@ void icon_rak14000(void)
 	g_air_status = 0;
 
 	x_text = 250;
-	y_text = 35;
+	y_text = 25;
 	display.setFont(SMALL_FONT);
 	display.setTextSize(1);
 
@@ -32,14 +32,14 @@ void icon_rak14000(void)
 
 		if (g_is_using_battery)
 		{
-			snprintf(disp_text, 59, "RAK10702   %s %d %d %02d:%02d Batt: %.2f V",
+			snprintf(disp_text, 59, "RAK10702 Indoor Comfort %s %d %d %02d:%02d Batt: %.2f V",
 					 months_txt[g_date_time.month - 1], g_date_time.date, g_date_time.year,
 					 g_date_time.hour, g_date_time.minute,
 					 read_batt() / 1000.0);
 		}
 		else
 		{
-			snprintf(disp_text, 59, "RAK10702   %s %d %d %02d:%02d",
+			snprintf(disp_text, 59, "RAK10702 Indoor Comfort %s %d %d %02d:%02d",
 					 months_txt[g_date_time.month - 1], g_date_time.date, g_date_time.year,
 					 g_date_time.hour, g_date_time.minute);
 		}
@@ -48,11 +48,11 @@ void icon_rak14000(void)
 	{
 		if (g_is_using_battery)
 		{
-			snprintf(disp_text, 59, "RAK10702 Air Quality Batt: %.2f V", read_batt() / 1000.0);
+			snprintf(disp_text, 59, "RAK10702 Indoor Comfort Batt: %.2f V", read_batt() / 1000.0);
 		}
 		else
 		{
-			snprintf(disp_text, 59, "RAK10702 Air Quality");
+			snprintf(disp_text, 59, "RAK10702 Indoor Comfort");
 		}
 	}
 
@@ -61,19 +61,25 @@ void icon_rak14000(void)
 
 	snprintf(disp_text, 29, "Temperature: %.2f~C", temp_values[temp_idx - 1]);
 	text_rak14000(x_text, y_text, disp_text, txt_color, 1);
-	y_text += 35;
+	y_text += 20;
 
 	snprintf(disp_text, 29, "Humidity: %.2f%%RH", humid_values[humid_idx - 1]);
 	text_rak14000(x_text, y_text, disp_text, txt_color, 1);
-	y_text += 35;
+	y_text += 20;
 
 	if ((found_sensors[ENV_ID].found_sensor) || (found_sensors[PRESS_ID].found_sensor))
 	{
 		snprintf(disp_text, 29, "Baro: %.2fmBar", baro_values[baro_idx - 1]);
 		text_rak14000(x_text, y_text, disp_text, txt_color, 1);
-		y_text += 35;
+		y_text += 20;
 	}
 
+	if ((found_sensors[LIGHT_ID].found_sensor) || (found_sensors[LIGHT2_ID].found_sensor))
+	{
+		snprintf(disp_text, 29, "Light: %.2f Lux", last_light_lux);
+		text_rak14000(x_text, y_text, disp_text, txt_color, 1);
+		y_text += 33;
+	}
 	uint8_t level = 0;
 
 	if (found_sensors[VOC_ID].found_sensor)
@@ -100,7 +106,7 @@ void icon_rak14000(void)
 		snprintf(disp_text, 29, "VOC %d", voc_values[voc_idx - 1]);
 		text_rak14000(x_text, y_text, disp_text, txt_color, 1);
 		draw_bar_rak14000(level, display_width - 72, y_text);
-		y_text += 35;
+		y_text += 33;
 	}
 
 	if (found_sensors[CO2_ID].found_sensor)
@@ -123,7 +129,7 @@ void icon_rak14000(void)
 		snprintf(disp_text, 29, "CO2 %.0f", co2_values[co2_idx - 1]);
 		text_rak14000(x_text, y_text, disp_text, txt_color, 1);
 		draw_bar_rak14000(level, display_width - 72, y_text);
-		y_text += 35;
+		y_text += 33;
 	}
 	if (found_sensors[PM_ID].found_sensor)
 	{
@@ -176,17 +182,17 @@ void icon_rak14000(void)
 		snprintf(disp_text, 29, "PM 1.0: %d", pm10_values[pm_idx - 1]);
 		text_rak14000(x_text, y_text, disp_text, txt_color, 1);
 		draw_bar_rak14000(level, display_width - 72, y_text);
-		y_text += 35;
+		y_text += 33;
 		level = (uint8_t)(pm25_values[pm_idx - 1] / 15);
 		snprintf(disp_text, 29, "PM 2.5: %d", pm25_values[pm_idx - 1]);
 		text_rak14000(x_text, y_text, disp_text, txt_color, 1);
 		draw_bar_rak14000(level, display_width - 72, y_text);
-		y_text += 35;
+		y_text += 33;
 		level = (uint8_t)(pm100_values[pm_idx - 1] / 40);
 		snprintf(disp_text, 29, "PM 10: %d", pm100_values[pm_idx - 1]);
 		text_rak14000(x_text, y_text, disp_text, txt_color, 1);
 		draw_bar_rak14000(level, display_width - 72, y_text);
-		y_text += 35;
+		y_text += 33;
 	}
 
 	if (old_air_status != g_air_status)
@@ -217,45 +223,45 @@ void draw_bar_rak14000(uint8_t level, uint16_t x, uint16_t y)
 	{
 	case 0:
 		display.drawRect(x, y, 10, 10, txt_color);
-		display.drawRect(x + 15, y-5, 10, 15, txt_color);
-		display.drawRect(x + 30, y-10, 10, 20, txt_color);
-		display.drawRect(x + 45, y-15, 10, 25, txt_color);
-		display.drawRect(x + 60, y-20, 10, 30, txt_color);
+		display.drawRect(x + 15, y - 5, 10, 15, txt_color);
+		display.drawRect(x + 30, y - 10, 10, 20, txt_color);
+		display.drawRect(x + 45, y - 15, 10, 25, txt_color);
+		display.drawRect(x + 60, y - 20, 10, 30, txt_color);
 		break;
 	case 1:
 		display.fillRect(x, y, 10, 10, txt_color);
-		display.drawRect(x + 15, y-5, 10, 15, txt_color);
-		display.drawRect(x + 30, y-10, 10, 20, txt_color);
-		display.drawRect(x + 45, y-15, 10, 25, txt_color);
-		display.drawRect(x + 60, y-20, 10, 30, txt_color);
+		display.drawRect(x + 15, y - 5, 10, 15, txt_color);
+		display.drawRect(x + 30, y - 10, 10, 20, txt_color);
+		display.drawRect(x + 45, y - 15, 10, 25, txt_color);
+		display.drawRect(x + 60, y - 20, 10, 30, txt_color);
 		break;
 	case 2:
 		display.fillRect(x, y, 10, 10, txt_color);
-		display.fillRect(x + 15, y-5, 10, 15, txt_color);
-		display.drawRect(x + 30, y-10, 10, 20, txt_color);
-		display.drawRect(x + 45, y-15, 10, 25, txt_color);
-		display.drawRect(x + 60, y-20, 10, 30, txt_color);
+		display.fillRect(x + 15, y - 5, 10, 15, txt_color);
+		display.drawRect(x + 30, y - 10, 10, 20, txt_color);
+		display.drawRect(x + 45, y - 15, 10, 25, txt_color);
+		display.drawRect(x + 60, y - 20, 10, 30, txt_color);
 		break;
 	case 3:
 		display.fillRect(x, y, 10, 10, txt_color);
-		display.fillRect(x + 15, y-5, 10, 15, txt_color);
-		display.fillRect(x + 30, y-10, 10, 20, txt_color);
-		display.drawRect(x + 45, y-15, 10, 25, txt_color);
-		display.drawRect(x + 60, y-20, 10, 30, txt_color);
+		display.fillRect(x + 15, y - 5, 10, 15, txt_color);
+		display.fillRect(x + 30, y - 10, 10, 20, txt_color);
+		display.drawRect(x + 45, y - 15, 10, 25, txt_color);
+		display.drawRect(x + 60, y - 20, 10, 30, txt_color);
 		break;
 	case 4:
 		display.fillRect(x, y, 10, 10, txt_color);
-		display.fillRect(x + 15, y-5, 10, 15, txt_color);
-		display.fillRect(x + 30, y-10, 10, 20, txt_color);
-		display.fillRect(x + 45, y-15, 10, 25, txt_color);
-		display.drawRect(x + 60, y-20, 10, 30, txt_color);
+		display.fillRect(x + 15, y - 5, 10, 15, txt_color);
+		display.fillRect(x + 30, y - 10, 10, 20, txt_color);
+		display.fillRect(x + 45, y - 15, 10, 25, txt_color);
+		display.drawRect(x + 60, y - 20, 10, 30, txt_color);
 		break;
 	default:
 		display.fillRect(x, y, 10, 10, txt_color);
-		display.fillRect(x + 15, y-5, 10, 15, txt_color);
-		display.fillRect(x + 30, y-10, 10, 20, txt_color);
-		display.fillRect(x + 45, y-15, 10, 25, txt_color);
-		display.fillRect(x + 60, y-20, 10, 30, txt_color);
+		display.fillRect(x + 15, y - 5, 10, 15, txt_color);
+		display.fillRect(x + 30, y - 10, 10, 20, txt_color);
+		display.fillRect(x + 45, y - 15, 10, 25, txt_color);
+		display.fillRect(x + 60, y - 20, 10, 30, txt_color);
 		break;
 	}
 }

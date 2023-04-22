@@ -71,14 +71,14 @@ void scientific_rak14000(void)
 
 		if (g_is_using_battery)
 		{
-			snprintf(disp_text, 59, "RAK10702   %s %d %d %02d:%02d Batt: %.2f V",
+			snprintf(disp_text, 59, "RAK10702 Indoor Comfort %s %d %d %02d:%02d Batt: %.2f V",
 					 months_txt[g_date_time.month - 1], g_date_time.date, g_date_time.year,
 					 g_date_time.hour, g_date_time.minute,
 					 read_batt() / 1000.0);
 		}
 		else
 		{
-			snprintf(disp_text, 59, "RAK10702   %s %d %d %02d:%02d",
+			snprintf(disp_text, 59, "RAK10702 Indoor Comfort %s %d %d %02d:%02d",
 					 months_txt[g_date_time.month - 1], g_date_time.date, g_date_time.year,
 					 g_date_time.hour, g_date_time.minute);
 		}
@@ -87,11 +87,11 @@ void scientific_rak14000(void)
 	{
 		if (g_is_using_battery)
 		{
-			snprintf(disp_text, 59, "RAK10702 Air Quality Batt: %.2f V", read_batt() / 1000.0);
+			snprintf(disp_text, 59, "RAK10702 Indoor Comfort Batt: %.2f V", read_batt() / 1000.0);
 		}
 		else
 		{
-			snprintf(disp_text, 59, "RAK10702 Air Quality");
+			snprintf(disp_text, 59, "RAK10702 Indoor Comfort");
 		}
 	}
 

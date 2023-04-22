@@ -47,14 +47,6 @@ volatile bool g_voc_is_active = false;
 void voc_read_wakeup(TimerHandle_t unused)
 {
 	MYLOG("VOC", "VOC triggered");
-	// // Switch on power of the sensors
-	// if (g_is_using_battery)
-	// {
-	// 	g_voc_is_active = true;
-	// 	MYLOG("VOC", "I2C might be off, switching power on");
-	// 	digitalWrite(EPD_POWER, HIGH);
-	// }
-
 	api_wake_loop(VOC_REQ);
 }
 
@@ -163,14 +155,6 @@ void read_rak12047(void)
  */
 void do_read_rak12047(void)
 {
-	// // Switch on power of the sensors
-	// if (g_is_using_battery)
-	// {
-	// 	g_voc_is_active = true;
-	// 	MYLOG("VOC", "I2C might be off, switching power on");
-	// 	digitalWrite(EPD_POWER, HIGH);
-	// }
-
 	uint16_t error;
 	uint16_t srawVoc = 0;
 	uint16_t defaultRh = 0x8000;
@@ -209,19 +193,6 @@ void do_read_rak12047(void)
 	error = sgp40.measureRawSignal(defaultRh, defaultT,
 								   srawVoc);
 	MYLOG("VOC", "srawVoc: %d", srawVoc);
-
-	// if (g_is_using_battery)
-	// { 
-	// 	// Switch off power of the sensors
-	// 	MYLOG("VOC", "g_epd_off %s", g_epd_off ? "true" : "false");
-	// 	MYLOG("VOC", "g_sensor_off %s", g_sensors_off ? "true" : "false");
-	// 	if (g_epd_off && g_sensors_off)
-	// 	{
-	// 		MYLOG("VOC", "I2C was off, switching power off");
-	// 		digitalWrite(EPD_POWER, LOW);
-	// 	}
-	// 	g_voc_is_active = false;
-	// }
 
 	// 3. Process raw signals by Gas Index Algorithm to get the VOC index values
 	if (error)

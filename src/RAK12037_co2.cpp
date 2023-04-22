@@ -89,7 +89,7 @@ void read_rak12037(void)
  */
 void startup_rak12037(void)
 {
-#ifdef SENSOR_POWER_OFF
+#if SENSOR_POWER_OFF > 0
 	// Power up the sensor
 	digitalWrite(CO2_PM_POWER, HIGH); // power off RAK12037
 	init_rak12037();
@@ -111,7 +111,7 @@ void startup_rak12037(void)
  */
 void shut_down_rak12037(void)
 {
-#ifdef SENSOR_POWER_OFF
+#if SENSOR_POWER_OFF > 0
 	// Disable power
 	digitalWrite(CO2_PM_POWER, LOW); // power off RAK12037
 #else

@@ -214,9 +214,6 @@ void loop()
 	// Sleep until we are woken up by an event
 	api_wait_wake();
 	{
-		// Enable I2C
-		Wire.begin();
-
 		while (g_task_event_type != NO_EVENT)
 		{
 			// Application specific event handler (timer event or others)
@@ -278,8 +275,6 @@ void loop()
 		g_task_event_type = 0;
 		delay(10);
 
-		// Disable I2C
-		Wire.end();
 		// Go back to sleep
 #if defined NRF52_SERIES || defined ESP32
 
