@@ -1,16 +1,13 @@
 /**
  * @file app.cpp
- * @author Bernd Giesecke (bernd.giesecke@rakwireless.com)
- * @brief Application specific functions. Mandatory to have init_app(),
- *        app_event_handler(), ble_data_handler(), lora_data_handler()
- *        and lora_tx_finished()
- * @version 0.2
- * @date 2022-01-30
+ * @author Bernd Giesecke (bernd@giesecke.tk)
+ * @brief RAK10702 application handlers
+ * @version 0.1
+ * @date 2023-05-13
  *
- * @copyright Copyright (c) 2022
+ * @copyright Copyright (c) 2023
  *
  */
-
 #include "app.h"
 /** Timer for delayed sending to keep duty cycle */
 SoftwareTimer delayed_sending;
@@ -30,14 +27,13 @@ uint8_t join_send_fail = 0;
 /** LoRaWAN packet */
 WisCayenne g_solution_data(255);
 
-/** Flag if a USB device is connected */
-// bool g_no_usb = false;
-
 /** Flag if the device is battery or permanent powered */
 bool g_is_using_battery = false;
 
-volatile bool new_dtr = false;
-volatile bool new_rts = false;
+/** Flag if power should be switched off*/
+bool switch_power_off = false;
+
+#include <nrfx_power.h>
 
 /**
  * @brief Application specific setup functions
@@ -47,23 +43,31 @@ void setup_app(void)
 {
 	// Initialize Serial for debug output
 	Serial.begin(115200);
-	// delay(5000);
-	time_t serial_timeout = millis();
-	// On nRF52840 the USB serial is not available immediately
-	while (!Serial)
+
+	nrfx_power_usb_state_t usb_status = nrfx_power_usbstatus_get();
+
+	if (usb_status == NRFX_POWER_USB_STATE_CONNECTED) // USB power detected
 	{
-		if ((millis() - serial_timeout) < 5000)
+		time_t serial_timeout = millis();
+		// On nRF52840 the USB serial is not available immediately
+		while (!Serial)
 		{
-			delay(100);
-			// digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
-		}
-		else
-		{
-			break;
+			if ((millis() - serial_timeout) < 5000)
+			{
+				delay(100);
+				// digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+			}
+			else
+			{
+				break;
+			}
 		}
 	}
+	else // No USB power detected
+	{
+		MYLOG("APP", "No USB connection detected");
+	}
 
-	// Enable BLE
 	g_enable_ble = true;
 }
 
@@ -75,12 +79,10 @@ void setup_app(void)
  */
 bool init_app(void)
 {
-	MYLOG("APP", "init_app");
-
 	api_set_version(SW_VERSION_1, SW_VERSION_2, SW_VERSION_3);
 
 	AT_PRINTF("===============================================");
-	AT_PRINTF("Air Quality Sensor");
+	AT_PRINTF("Indoor Comfort Sensor");
 	AT_PRINTF("Built with RAK's WisBlock");
 	AT_PRINTF("SW Version %d.%d.%d", g_sw_ver_1, g_sw_ver_2, g_sw_ver_3);
 	AT_PRINTF("LoRa(R) is a registered trademark or service\nmark of Semtech Corporation or its affiliates.\nLoRaWAN(R) is a licensed mark.");
@@ -89,11 +91,6 @@ bool init_app(void)
 	// Enable EPD and I2C power
 	pinMode(EPD_POWER, OUTPUT);
 	digitalWrite(EPD_POWER, HIGH);
-
-#if HAS_EPD > 0
-	MYLOG("APP", "Init RAK14000");
-	init_rak14000();
-#endif
 
 	// CO2 & PM POWER
 	pinMode(CO2_PM_POWER, OUTPUT);
@@ -107,31 +104,46 @@ bool init_app(void)
 	pinMode(PIR_POWER, OUTPUT);
 	digitalWrite(PIR_POWER, HIGH);
 
-	delay(500);
-	// Scan the I2C interfaces for devices
-	find_modules();
+	Wire.begin();
+	delay(100);
+	Wire.beginTransmission(0x52);
+	byte error = Wire.endTransmission();
+	if (error == 0)
+	{
+		if (!init_rak12002())
+		{
+			has_rak12002 = false;
+		}
+		else
+		{
+			has_rak12002 = true;
+		}
+	}
+	else
+	{
+		has_rak12002 = false;
+	}
 
-	// Initialize RGB LED
-	init_rgb();
-	set_rgb_color(246, 190, 0); //
+#if HAS_EPD > 0
+	MYLOG("APP", "Init RAK14000");
+	init_rak14000();
+#endif
 
 	// Initialize the User AT command list
 	init_user_at();
 
+	delay(500);
+	// Scan the I2C interfaces for devices
+	find_modules();
+
 	// Announce found modules with +EVT: over Serial
 	announce_modules();
 
-	AT_PRINTF("============================\n");
+	AT_PRINTF("===============================================\n");
 
 	Serial.flush();
 	// Reset the packet
 	g_solution_data.reset();
-
-	// Init PIR
-	init_pir();
-
-	// BUTTON
-	init_button();
 
 	// Check if device is running from battery
 	float batt_val = read_batt();
@@ -146,15 +158,19 @@ bool init_app(void)
 
 	rgb_toggle.begin(15000, do_rgb_toggle, NULL, false);
 	// If on battery usage, start timer to switch off the RGB LED
-	if (g_is_using_battery)
+	if (g_has_rgb)
 	{
-		MYLOG("APP", "Device is battery powered!");
-		rgb_toggle.start();
+		if (g_is_using_battery)
+		{
+			MYLOG("APP", "Device is battery powered!");
+			rgb_toggle.start();
+		}
+		else
+		{
+			MYLOG("APP", "Device is external powered!");
+		}
 	}
-	else
-	{
-		MYLOG("APP", "Device is external powered!");
-	}
+
 	// Prepare timer to send after the sensors were awake for 30 seconds
 	delayed_sending.begin(30000, send_delayed, NULL, false);
 
@@ -185,15 +201,13 @@ bool init_app(void)
 		}
 	}
 
-	digitalWrite(EPD_POWER, LOW);
-	Wire.end();
-	pinMode(WB_I2C1_SDA, INPUT);
-	pinMode(WB_I2C1_SCL, INPUT);
-	digitalWrite(CO2_PM_POWER, LOW);
+	if (g_is_using_battery)
+	{
+		power_i2c(false);
+		power_modules(false);
+	}
 	return true;
 }
-
-bool switch_power_off = true;
 
 /**
  * @brief Application specific event handler
@@ -202,23 +216,144 @@ bool switch_power_off = true;
  */
 void app_event_handler(void)
 {
-	digitalWrite(EPD_POWER, HIGH);
-	Wire.begin();
+	// std::string s = std::bitset<16>(g_task_event_type).to_string(); // string conversion
+	// MYLOG("APP", "App Event  %s", s.c_str());
 
-	// Handle Reset request
-	if ((g_task_event_type & RST_REQ) == RST_REQ)
+	// Power up and initialize I2C
+	power_i2c(true);
+
+	/*********************************************************/
+	/* Status & Send event handling                          */
+	/*********************************************************/
+	if ((g_task_event_type & STATUS) == STATUS)
 	{
-		g_task_event_type &= N_RST_REQ;
-		// if (g_epd_off)
-		// {
-		// 	MYLOG("BTN", "EPD was off");
-		// startup_rak14000();
-		// }
-		rak14000_start_screen(false);
-		delay(3000);
-		api_reset();
+		g_task_event_type &= N_STATUS;
+		MYLOG("APP", "Wakeup Status");
+		if (!g_is_using_battery)
+		{
+			g_task_event_type |= SEND_NOW;
+		}
+		else
+		{
+			MYLOG("APP", "Wake-up, power up sensors");
+			switch_power_off = false;
+			power_modules(true);
+			delayed_sending.start();
+		}
 	}
 
+	if ((g_task_event_type & SEND_NOW) == SEND_NOW)
+	{
+		g_task_event_type &= N_SEND_NOW;
+		MYLOG("APP", "Wakeup Send Now");
+		MYLOG("APP", "Start reading and sending");
+
+		// Reset the packet
+		g_solution_data.reset();
+
+		// Get values from the connected modules
+		get_sensor_values();
+
+		if (g_is_using_battery)
+		{
+			switch_power_off = true;
+			// Get battery level
+			float batt_level_f = read_batt();
+			g_solution_data.addVoltage(LPP_CHANNEL_BATT, batt_level_f / 1000.0);
+		}
+		// Add occupation information
+		g_solution_data.addPresence(LPP_CHANNEL_SWITCH, g_occupied);
+
+#if HAS_EPD > 0
+		// Refresh display
+		MYLOG("APP", "Refresh RAK14000");
+		refresh_rak14000();
+#else
+		// No display detected, set RGB color
+		set_rgb_air_status();
+#endif
+
+		MYLOG("APP", "Packetsize %d", g_solution_data.getSize());
+
+		if (g_lorawan_settings.lorawan_enable)
+		{
+			if (g_lpwan_has_joined)
+			{
+				lmh_error_status result = send_lora_packet(g_solution_data.getBuffer(), g_solution_data.getSize());
+				switch (result)
+				{
+				case LMH_SUCCESS:
+					MYLOG("APP", "Packet enqueued");
+					break;
+				case LMH_BUSY:
+					MYLOG("APP", "LoRa transceiver is busy");
+					AT_PRINTF("+EVT:BUSY\n");
+					break;
+				case LMH_ERROR:
+					AT_PRINTF("+EVT:SIZE_ERROR\n");
+					MYLOG("APP", "Packet error, too big to send with current DR");
+					break;
+				}
+			}
+		}
+		else
+		{
+			// Add the device DevEUI as a device ID to the packet
+			g_solution_data.addDevID(LPP_CHANNEL_DEVID, &g_lorawan_settings.node_device_eui[4]);
+
+			// Send packet over LoRa
+			if (send_p2p_packet(g_solution_data.getBuffer(), g_solution_data.getSize()))
+			{
+				MYLOG("APP", "Packet enqueued");
+			}
+			else
+			{
+				AT_PRINTF("+EVT:SIZE_ERROR\n");
+				MYLOG("APP", "Packet too big");
+			}
+		}
+		// Reset the packet
+		g_solution_data.reset();
+
+		// Check if room is occupied
+		if (g_occupied)
+		{
+			// Occupied, use default update time
+			api_timer_restart(g_lorawan_settings.send_repeat_time);
+		}
+		else
+		{
+			// Not occupied, double the update time
+			api_timer_restart(g_lorawan_settings.send_repeat_time * 2);
+		}
+
+		if (switch_power_off)
+		{
+			MYLOG("APP", ">>>> POWER OFF");
+			// Power down the modules
+			power_modules(false);
+		}
+	}
+
+	/*********************************************************/
+	/* VOC sensor interval read event handling               */
+	/*********************************************************/
+	// VOC read request event
+	if ((g_task_event_type & VOC_REQ) == VOC_REQ)
+	{
+		g_task_event_type &= N_VOC_REQ;
+		if (digitalRead(EPD_POWER) == LOW)
+		{
+			MYLOG("APP", "VOC power up I2C");
+			power_i2c(true);
+		}
+		MYLOG("APP", "Handle VOC");
+		do_read_rak12047();
+	}
+
+	/*********************************************************/
+	/* Display & LED event handling                          */
+	/*********************************************************/
 	// Handle Display updates
 	if ((g_task_event_type & DISP_UPDATE) == DISP_UPDATE)
 	{
@@ -244,6 +379,9 @@ void app_event_handler(void)
 		set_rgb_color(0, 0, 0);
 	}
 
+	/*********************************************************/
+	/* PIR event handling                                    */
+	/*********************************************************/
 	// Unoccupied event
 	if ((g_task_event_type & ROOM_EMPTY) == ROOM_EMPTY)
 	{
@@ -276,145 +414,22 @@ void app_event_handler(void)
 		}
 	}
 
-	if ((g_task_event_type & STATUS) == STATUS)
+	/*********************************************************/
+	/* Device reset request event                            */
+	/*********************************************************/
+	// Handle Reset request
+	if ((g_task_event_type & RST_REQ) == RST_REQ)
 	{
-		g_task_event_type &= N_STATUS;
-
-		switch_power_off = false;
-		if (!g_is_using_battery)
-		{
-			g_task_event_type |= SEND_NOW;
-			power_modules(true);
-		}
-		else
-		{
-			MYLOG("APP", "Wake-up, power up sensors");
-			power_modules(true);
-			delayed_sending.start();
-		}
-	}
-
-	// Timer triggered event
-	if ((g_task_event_type & SEND_NOW) == SEND_NOW)
-	{
-		g_task_event_type &= N_SEND_NOW;
-
-		switch_power_off = true;
-		MYLOG("APP", "Start reading and sending");
-
-		// Reset the packet
-		g_solution_data.reset();
-
-		// Get values from the connected modules
-		get_sensor_values();
-
-		if (g_is_using_battery)
-		{
-			// Get battery level
-			float batt_level_f = read_batt();
-			g_solution_data.addVoltage(LPP_CHANNEL_BATT, batt_level_f / 1000.0);
-		}
-		// Add occupation information
-		g_solution_data.addPresence(LPP_CHANNEL_SWITCH, g_occupied);
-
-#if HAS_EPD > 0
-		// Refresh display
-		MYLOG("APP", "Refresh RAK14000");
-		refresh_rak14000();
-#endif
-
-		MYLOG("APP", "Packetsize %d", g_solution_data.getSize());
-
-		if (g_lorawan_settings.lorawan_enable)
-		{
-			if (g_lpwan_has_joined)
-			{
-				lmh_error_status result = send_lora_packet(g_solution_data.getBuffer(), g_solution_data.getSize());
-				switch (result)
-				{
-				case LMH_SUCCESS:
-					MYLOG("APP", "Packet enqueued");
-					break;
-				case LMH_BUSY:
-					MYLOG("APP", "LoRa transceiver is busy");
-					AT_PRINTF("+EVT:BUSY\n");
-					break;
-				case LMH_ERROR:
-					AT_PRINTF("+EVT:SIZE_ERROR\n");
-					MYLOG("APP", "Packet error, too big to send with current DR");
-					break;
-				}
-			}
-		}
-		else
-		{
-			// Add the device DevEUI as a device ID to the packet
-			uint8_t packet_buffer[g_solution_data.getSize() + 8];
-			memcpy(packet_buffer, g_lorawan_settings.node_device_eui, 8);
-			memcpy(&packet_buffer[8], g_solution_data.getBuffer(), g_solution_data.getSize());
-
-			// Send packet over LoRa
-			if (send_p2p_packet(packet_buffer, g_solution_data.getSize() + 8))
-			{
-				MYLOG("APP", "Packet enqueued");
-			}
-			else
-			{
-				AT_PRINTF("+EVT:SIZE_ERROR\n");
-				MYLOG("APP", "Packet too big");
-			}
-		}
-		// Reset the packet
-		g_solution_data.reset();
-
-		// Check if room is occupied
-		if (g_occupied)
-		{
-			// Occupied, use default update time
-			api_timer_restart(g_lorawan_settings.send_repeat_time);
-		}
-		else
-		{
-			// Not occupied, double the update time
-			api_timer_restart(g_lorawan_settings.send_repeat_time * 2);
-		}
-
-		// if (g_is_using_battery)
-		{
-			MYLOG("APP", ">>>> POWER OFF");
-			// Power down the modules
-			power_modules(false);
-		}
-	}
-
-	// VOC read request event
-	if ((g_task_event_type & VOC_REQ) == VOC_REQ)
-	{
-		g_task_event_type &= N_VOC_REQ;
-		MYLOG("APP", "Handle VOC");
-		do_read_rak12047();
-	}
-
-	/*********************************************/
-	/** Select between Bosch BSEC algorithm for  */
-	/** IAQ index or simple T/H/P readings       */
-	/*********************************************/
-	// BSEC read request event
-	if ((g_task_event_type & BSEC_REQ) == BSEC_REQ)
-	{
-		g_task_event_type &= N_BSEC_REQ;
-
-#if USE_BSEC == 1
-		do_read_rak1906_bsec();
-#endif
+		g_task_event_type &= N_RST_REQ;
+		rak14000_start_screen(false);
+		delay(3000);
+		api_reset();
 	}
 
 	if (switch_power_off)
-	{
-		digitalWrite(EPD_POWER, LOW);
-		Wire.end();
-		pinMode(WB_I2C1_SDA, INPUT);
-		pinMode(WB_I2C1_SCL, INPUT);
+	{ 
+		// Shut down I2C
+		power_i2c(false);
 	}
 }
 
@@ -424,11 +439,15 @@ void app_event_handler(void)
  */
 void ble_data_handler(void)
 {
+	// std::string s = std::bitset<16>(g_task_event_type).to_string(); // string conversion
+	// MYLOG("APP", "BLE Event  %s", s.c_str());
 	if (g_enable_ble)
 	{
 		// BLE UART data handling
 		if ((g_task_event_type & BLE_DATA) == BLE_DATA)
 		{
+			// Power up and initializa I2C (just in case)
+			power_i2c(true);
 			// MYLOG("AT", "RECEIVED BLE");
 			/** BLE UART data arrived */
 			g_task_event_type &= N_BLE_DATA;
@@ -439,6 +458,8 @@ void ble_data_handler(void)
 				delay(5);
 			}
 			at_serial_input(uint8_t('\n'));
+			// Shut down I2C
+			power_i2c(false);
 		}
 	}
 }
@@ -449,6 +470,8 @@ void ble_data_handler(void)
  */
 void lora_data_handler(void)
 {
+	// std::string s = std::bitset<16>(g_task_event_type).to_string(); // string conversion
+	// MYLOG("APP", "LoRa Event %s", s.c_str());
 
 	// LoRa Join finished handling
 	if ((g_task_event_type & LORA_JOIN_FIN) == LORA_JOIN_FIN)
@@ -480,7 +503,7 @@ void lora_data_handler(void)
 				api_reset();
 			}
 		}
-		if ((join_send_fail < 2) && !g_join_result)
+		if ((join_send_fail == 1) && !g_join_result)
 		{
 			// Force a sensor reading
 			api_wake_loop(STATUS);
@@ -491,12 +514,6 @@ void lora_data_handler(void)
 	if ((g_task_event_type & LORA_TX_FIN) == LORA_TX_FIN)
 	{
 		g_task_event_type &= N_LORA_TX_FIN;
-
-		// #if HAS_EPD > 0
-		// 		// Refresh display
-		// 		MYLOG("APP", "Refresh RAK14000");
-		// 		api_wake_loop(DISP_UPDATE);
-		// #endif
 		MYLOG("APP", "LoRa TX cycle %s", g_rx_fin_result ? "finished ACK" : "failed NAK");
 
 		if ((g_lorawan_settings.confirmed_msg_enabled) && (g_lorawan_settings.lorawan_enable))
@@ -586,8 +603,7 @@ void lora_data_handler(void)
  * @brief Timer function used to avoid sending packages too often.
  * 			Delays the next package by 10 seconds
  *
- * @param unused
- * 			Timer handle, not used
+ * @param unused Timer handle, not used
  */
 void send_delayed(TimerHandle_t unused)
 {
@@ -598,11 +614,14 @@ void send_delayed(TimerHandle_t unused)
 /**
  * @brief Toggle RGB Visibility
  *
- * @param unused
+ * @param unused Timer handle, not used
  */
 void do_rgb_toggle(TimerHandle_t unused)
 {
-	api_wake_loop(LED_REQ);
+	if (g_has_rgb)
+	{
+		api_wake_loop(LED_REQ);
+	}
 }
 
 /**

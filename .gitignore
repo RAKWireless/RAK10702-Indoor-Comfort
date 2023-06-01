@@ -4,7 +4,4 @@
 .vscode/launch.json
 .vscode/ipch
 Generated
-Generated/*
-*.zip
 Debug-Build
-dev_settings.txt
