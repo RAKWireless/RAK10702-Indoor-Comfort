@@ -2,8 +2,8 @@
  * @file RAK12047_voc.cpp
  * @author Bernd Giesecke (bernd.giesecke@rakwireless.com)
  * @brief Read values from the RAK12047 VOC sensor
- *        The VOC algorithm requires a reading every one second.
- *        This code uses a timer to set the VOC_REQ every one second
+ *        The VOC algorithm requires a reading every sampling_interval second.
+ *        This code uses a timer to set the VOC_REQ every sampling_interval second
  *        and wake up the loop to perform the readings
  * @date 2022-02-05
  *
@@ -15,7 +15,7 @@
 #include <VOCGasIndexAlgorithm.h>
 
 /** Sampling interval for the algorithm in seconds */
-int32_t sampling_interval = 10;
+int32_t sampling_interval = 30;
 /** Instance for the VOC sensor */
 SensirionI2CSgp40 sgp40;
 /** Instance for the VOC algorithm */
@@ -33,8 +33,11 @@ bool voc_valid = false;
 /** Buffer for debug output */
 char errorMessage[256];
 
-/** Counter to discard the first 100 readings */
+/** Counter to discard the first discard_number readings */
 uint16_t discard_counter = 0;
+
+/** Number of measurements to discard */
+uint16_t discard_number = 30;
 
 /** Flag if VOC is active, used from display driver to avoid shut down of power */
 volatile bool g_voc_is_active = false;
@@ -115,7 +118,7 @@ bool init_rak12047(void)
 	// Reset discard counter
 	discard_counter = 0;
 
-	// Set VOC reading interval to 10 seconds
+	// Set VOC reading interval to sampling_interval seconds
 	voc_read_timer.begin(sampling_interval * 1000, voc_read_wakeup, NULL, true);
 	voc_read_timer.start();
 	return true;
@@ -209,14 +212,14 @@ void do_read_rak12047(void)
 	}
 	else
 	{
-		if (discard_counter <= 100)
+		if (discard_counter <= discard_number)
 		{
-			// Discard the first 100 readings
+			// Discard the first discard_number readings
 			voc_algorithm.process(srawVoc);
 			discard_counter++;
 			MYLOG("VOC", "Discard reading %d", discard_counter);
 		}
-		else if (discard_counter == 101)
+		else if (discard_counter == discard_number + 1)
 		{
 			// First accepted reading
 			voc_index = voc_algorithm.process(srawVoc);

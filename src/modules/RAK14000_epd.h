@@ -47,12 +47,14 @@ extern float co2_values[];
 extern uint16_t pm10_values[];
 extern uint16_t pm25_values[];
 extern uint16_t pm100_values[];
+extern float light_values[];
 extern uint8_t voc_idx;
 extern uint8_t temp_idx;
 extern uint8_t humid_idx;
 extern uint8_t baro_idx;
 extern uint8_t co2_idx;
 extern uint8_t pm_idx;
+extern uint8_t light_idx;
 
 extern char disp_text[60];
 
@@ -112,6 +114,11 @@ extern unsigned char barometer_img[];
 extern uint16_t barometer_img_width;
 extern uint16_t barometer_img_height;
 extern uint16_t barometer_img_length;
+
+extern unsigned char brightness_img[];
+extern uint16_t brightness_img_width;
+extern uint16_t brightness_img_height;
+extern uint16_t brightness_img_length;
 
 extern unsigned char voc_img[];
 extern uint16_t voc_img_width;

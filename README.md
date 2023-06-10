@@ -63,7 +63,6 @@ For the displays, the RAK14000 EPD module with the 2.13" display can be used. Bu
 - [ArduinoJson](https://registry.platformio.org/libraries/bblanchon/ArduinoJson) ⤴️
 ## Sensor libraries
 - [Adafruit BME680 Library](https://registry.platformio.org/libraries/adafruit/Adafruit%20BME680%20Library) ⤴️
-- [Adafruit LPS2X](https://registry.platformio.org/libraries/adafruit/Adafruit%20LPS2X) ⤴️
 - [Adafruit Unified Sensor](https://registry.platformio.org/libraries/adafruit/Adafruit%20Unified%20Sensor) ⤴️
 - [ClosedCube OPT3001](https://github.com/beegee-tokyo/ClosedCube_OPT3001_Arduino) ⤴️
 - [Melopero RV3028](https://registry.platformio.org/libraries/melopero/Melopero%20RV3028) ⤴️
@@ -78,7 +77,8 @@ For the displays, the RAK14000 EPD module with the 2.13" display can be used. Bu
 - [RAK12039 PM Sensor](https://registry.platformio.org/libraries/beegee-tokyo/RAK12039_PM_Sensor) ⤴️
 - [SparkFun SCD30 Arduino Library](https://registry.platformio.org/libraries/sparkfun/SparkFun%20SCD30%20Arduino%20Library) ⤴️
 - [Adafruit EPD](https://registry.platformio.org/libraries/adafruit/Adafruit%20EPD)
-- [Bosch BSEC V1.6.1480](https://registry.platformio.org/libraries/boschsensortec/BSEC%20Software%20Library)
+- [NCP5623 RGB LED](https://registry.platformio.org/libraries/rakwireless/RAKwireless%20NCP5623%20RGB%20LED%20library) ⤴️
+- [OneButton](https://registry.platformio.org/libraries/mathertel/OneButton)
 
 ### _REMARK_     
 The project was developed using Platform IO.    
@@ -191,10 +191,7 @@ Channel ID's in cursive are extended format and not supported by standard Cayenn
 Example decoder [RAKwireless_Standardized_Payload.js] for TTN, Chirpstack, Helium and Datacake can be found in the folder [RAKwireless_Standardized_Payload](https://github.com/RAKWireless/RAKwireless_Standardized_Payload) repo. ⤴️
 
 ### _REMARK_
-If using LoRa P2P, the first 8 bytes of the data packet are the devices Dev EUI. This way in LoRa P2P the "gateway" can determine which node sent the packet.
-
-### _REMARK_
-If the Bosch BSEC library is used, Gas Resistance 2 value is the IAQ index calculated by BSEC algorithm.     
+If using LoRa P2P, a special packet is included the contains the last 4 bytes of the devices Dev EUI. This way in LoRa P2P the "gateway" can determine which node sent the packet.
 
 ----
 # Compiler Flags
@@ -216,20 +213,18 @@ All defines are in platformio.ini as build flags
 	-DMY_DEBUG=0         ; 0 Disable application debug output
 
 ## Base Board selection
-	-DBASE_BOARD=0       ; 1 = RAK19003 0 = other base boards
+	-D_CUSTOM_BOARD_=1      ; If set, no LED and no automatic BLE advertising
+
+## Sensor power control options
+	-DFORCE_PWR_SRC=0		; Force external power behaviour 0 = automatic 1 = force external power behaviour, 2 = force battery power behaviour
+	-DSENSOR_POWER_OFF=1	; Switch between 1 = sensor power down and 0 = sensor sleep modes
 
 ## Bluetooth selection
-
 	-DNO_BLE_LED=1
 
 ## Display options
-	-DHAS_EPD=0      ; 1 = RAK14000 4.2" present 2 = 2.13" BW present, 3 = 2.13" BWR present, 4 - 3.52" BW present, 0 = no RAK14000 present
-	-DEPD_ROTATION=3 ; 3 = top at cable connection, 1 top opposite of cable connection. Only for 4.2" display
-
-## Usage of Bosch BSEC library
-
-	-D USE_BSEC=1    ; 1 = Use Bosch BSEC algo, 0 = use simple T/H/P readings
-	-L".pio/libdeps/rak4631-release/BSEC Software Library/src/cortex-m4/fpv4-sp-d16-hard"
+	-DHAS_EPD=0      ; 1 = has EPD 0 = no EPD
+	-DEPD_ROTATION=3 ; 1 = FPC at bottom 3 = FPC at top
 
 ----
 
@@ -242,7 +237,6 @@ Datacake is an easy to use _**Low Code IoT Platform**_. In my Datacake account I
 In the device configuration the Datacake decoder from the [_**decoders**_](./decoders) folder is used.
 
 ## Datacake fields
-As the SI and PGA values are sent as 10 times of the value, beside of the data fields a formula feed is required to transform the received values to the real values.
 
 | Field Name |  Identifier | Type |
 | --- | --- | --- |
@@ -257,6 +251,6 @@ As the SI and PGA values are sent as 10 times of the value, beside of the data f
 | Battery |  VOLTAGE_1 |  Float |  
 
 ## Datacake visualization
-In the dashboard you can show the current status and the latest SI and PGA levels.    
+
 ![Datacake Rule](./assets/datacake-dashboard.png)
 

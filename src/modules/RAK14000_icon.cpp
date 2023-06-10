@@ -22,7 +22,7 @@ void icon_rak14000(void)
 	g_air_status = 0;
 
 	x_text = 250;
-	y_text = 25;
+	y_text = 20;
 	display.setFont(SMALL_FONT);
 	display.setTextSize(1);
 
@@ -57,7 +57,7 @@ void icon_rak14000(void)
 	}
 
 	display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-	text_rak14000((display_width / 2) - (txt_w / 2), 1, disp_text, (uint16_t)txt_color, 1);
+	text_rak14000((display_width / 2) - (txt_w / 2), 290, disp_text, (uint16_t)txt_color, 1);
 
 	snprintf(disp_text, 29, "Temperature: %.2f~C", temp_values[temp_idx - 1]);
 	text_rak14000(x_text, y_text, disp_text, txt_color, 1);

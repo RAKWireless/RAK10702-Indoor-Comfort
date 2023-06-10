@@ -26,6 +26,11 @@ void scientific_rak14000(void)
 	{
 		has_baro = true;
 	}
+	bool has_light = false;
+	if (has_rak1903 || has_rak12010)
+	{
+		has_light = true;
+	}
 	if (has_rak12047)
 	{
 		voc_rak14000();
@@ -34,12 +39,28 @@ void scientific_rak14000(void)
 	{
 		co2_rak14000(has_rak12039);
 	}
-	temp_rak14000(has_rak12039, has_baro);
-	humid_rak14000(has_rak12039, has_baro);
+
 	if (has_baro)
 	{
 		baro_rak14000(has_rak12039);
+		temp_rak14000(has_rak12039, has_baro);
+		humid_rak14000(has_rak12039, has_baro);
 	}
+	else
+	{
+		if (has_light)
+		{
+			light_rak14000(has_rak12039);
+			temp_rak14000(has_rak12039, has_light);
+			humid_rak14000(has_rak12039, has_light);
+		}
+		else
+		{
+			temp_rak14000(has_rak12039, false);
+			humid_rak14000(has_rak12039, false);
+		}
+	}
+
 	if (has_rak12039)
 	{
 		pm_rak14000();
@@ -95,20 +116,24 @@ void scientific_rak14000(void)
 	}
 
 	display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-	text_rak14000((display_width / 2) - (txt_w / 2), 1, disp_text, (uint16_t)txt_color, 1);
+	text_rak14000((display_width / 2) - (txt_w / 2), 290, disp_text, (uint16_t)txt_color, 1);
 
 	if (has_rak12039)
 	{
 		pm_rak14000();
-		display.drawLine(0, display_height / 2 + 3, display_width / 2 + 50, display_height / 2 + 3, (uint16_t)txt_color);
-		display.drawLine(display_width / 2 + 50, display_height / 5, display_width, display_height / 5, (uint16_t)txt_color);
-		display.drawLine(display_width / 2 + 50, 10, display_width / 2 + 50, display_height, (uint16_t)txt_color);
+		// Vertical divider
+		display.drawLine(display_width / 2 + 50, 0, display_width / 2 + 50, display_height - 13, (uint16_t)txt_color);
+		// Horizontal dividers
+		display.drawLine(0, (display_height / 2 + 3) - 10, display_width / 2 + 50, (display_height / 2 + 3) - 10, (uint16_t)txt_color);
+		display.drawLine(display_width / 2 + 50, (display_height / 5) - 10, display_width, (display_height / 5) - 10, (uint16_t)txt_color);
 	}
 	else
 	{
-		display.drawLine(display_width / 2 + 50, 10, display_width / 2 + 50, display_height, (uint16_t)txt_color);
-		display.drawLine(display_width / 2 + 50, display_height / 3, display_width, display_height / 3, (uint16_t)txt_color);
-		display.drawLine(display_width / 2 + 50, display_height / 3 * 2, display_width, display_height / 3 * 2, (uint16_t)txt_color);
+		// Vertical divider
+		display.drawLine(display_width / 2 + 50, 0, display_width / 2 + 50, display_height - 13, (uint16_t)txt_color);
+		// Horizontal dividers
+		display.drawLine(display_width / 2 + 50, (display_height / 3) - 10, display_width, (display_height / 3) - 10, (uint16_t)txt_color);
+		display.drawLine(display_width / 2 + 50, (display_height / 3 * 2) - 10, display_width, (display_height / 3 * 2) - 10, (uint16_t)txt_color);
 	}
 }
 
@@ -119,10 +144,10 @@ void scientific_rak14000(void)
 void voc_rak14000(void)
 {
 	x_text = 2;
-	y_text = 10;
+	y_text = 1;
 	s_text = 2;
 	x_graph = 0;
-	y_graph = 60;
+	y_graph = 50;
 	h_bar = display_height / 2 - 60;
 	w_bar = 2;
 	bar_divider = 500.0 / h_bar;
@@ -195,7 +220,7 @@ void co2_rak14000(bool has_pm)
 	if (has_pm)
 	{
 		x_text = display_width / 2 + 53;
-		y_text = 15;
+		y_text = 5;
 		s_text = 2;
 		spacer = 20;
 
@@ -239,10 +264,10 @@ void co2_rak14000(bool has_pm)
 	else
 	{
 		x_text = 2;
-		y_text = display_height / 2;
+		y_text = (display_height / 2) - 10;
 		s_text = 2;
 		x_graph = 0;
-		y_graph = display_height / 2 + 60;
+		y_graph = display_height / 2 + 40;
 		h_bar = display_height / 2 - 62;
 		w_bar = 2;
 		bar_divider = 2500 / h_bar;
@@ -341,7 +366,7 @@ void co2_rak14000(bool has_pm)
 void pm_rak14000(void)
 {
 	x_text = display_width / 2 + 53;
-	y_text = display_height / 4;
+	y_text = (display_height / 4) - 10;
 	s_text = 2;
 
 	// Write value
@@ -464,11 +489,11 @@ void temp_rak14000(bool has_pm, bool has_baro)
 	x_text = 25;
 	if (has_baro)
 	{
-		y_text = display_height / 2 + 10;
+		y_text = display_height / 2;
 	}
 	else
 	{
-		y_text = display_height / 4 + 105;
+		y_text = display_height / 4 + 95;
 	}
 	s_text = 2;
 	spacer = 60;
@@ -529,11 +554,11 @@ void humid_rak14000(bool has_pm, bool has_baro)
 	x_text = 25;
 	if (has_baro)
 	{
-		y_text = display_height / 2 + (display_height / 2 / 3) + 10;
+		y_text = display_height / 2 + (display_height / 2 / 3);
 	}
 	else
 	{
-		y_text = (display_height / 4) + 165;
+		y_text = (display_height / 4) + 155;
 	}
 	s_text = 2;
 	spacer = 60;
@@ -590,7 +615,7 @@ void humid_rak14000(bool has_pm, bool has_baro)
 void baro_rak14000(bool has_pm)
 {
 	x_text = 25;
-	y_text = display_height / 2 + (display_height / 2 / 3 * 2) + 10;
+	y_text = display_height / 2 + (display_height / 2 / 3 * 2);
 	s_text = 2;
 	spacer = 60;
 
@@ -633,6 +658,62 @@ void baro_rak14000(bool has_pm)
 		text_rak14000(x_text + spacer, y_text + 16, disp_text, (uint16_t)txt_color, s_text);
 
 		snprintf(disp_text, 29, "mBar");
+		text_rak14000(x_text + spacer + txt_w + 4, y_text + 16 + 4, disp_text, (uint16_t)txt_color, 1);
+	}
+}
+
+/**
+ * @brief Update display for light
+ *
+ * @param has_pm changes display type and position if
+ * 			PM sensor is connected
+ */
+void light_rak14000(bool has_pm)
+{
+	x_text = 25;
+	y_text = display_height / 2 + (display_height / 2 / 3 * 2);
+	s_text = 2;
+	spacer = 60;
+
+	// If PM sensor is not available, position is different
+	if (!has_pm)
+	{
+		x_text = display_width / 2 + 53;
+		y_text = display_height / 3 * 2 + 15;
+		s_text = 2;
+		spacer = 50;
+
+		// Write value
+		display.drawBitmap(display_width - (display_width / 4 - 16), y_text, brightness_img, 32, 32, txt_color);
+
+		snprintf(disp_text, 29, "Lux");
+		display.setFont(SMALL_FONT);
+		display.setTextSize(1);
+		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
+
+		text_rak14000(display_width - txt_w - 3, y_text + spacer + 4, disp_text, (uint16_t)txt_color, 1);
+
+		snprintf(disp_text, 29, "%.1f ", last_light_lux);
+		display.setFont(LARGE_FONT);
+		display.setTextSize(1);
+		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w2, &txt_h);
+
+		text_rak14000(display_width - txt_w - txt_w2 - 6, y_text + spacer, disp_text, (uint16_t)txt_color, s_text);
+	}
+	else
+	{
+		// Write value
+		display.drawBitmap(x_text, y_text, brightness_img, 32, 32, txt_color);
+
+		snprintf(disp_text, 29, "%.2f", last_light_lux);
+
+		display.setFont(LARGE_FONT);
+		display.setTextSize(1);
+		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
+
+		text_rak14000(x_text + spacer, y_text + 16, disp_text, (uint16_t)txt_color, s_text);
+
+		snprintf(disp_text, 29, "Lux");
 		text_rak14000(x_text + spacer + txt_w + 4, y_text + 16 + 4, disp_text, (uint16_t)txt_color, 1);
 	}
 }

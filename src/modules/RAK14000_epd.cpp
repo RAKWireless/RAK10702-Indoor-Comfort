@@ -427,7 +427,7 @@ void rak14000_start_screen(bool startup)
 					 g_date_time.hour, g_date_time.minute);
 		}
 		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-		text_rak14000((display_width / 2) - (txt_w / 2), 1, disp_text, (uint16_t)txt_color, 1);
+		text_rak14000((display_width / 2) - (txt_w / 2), 290, disp_text, (uint16_t)txt_color, 1);
 
 		// snprintf(disp_text, 59, "%d/%d/%d %d:%02d", g_date_time.date, g_date_time.month, g_date_time.year,
 		// 		 g_date_time.hour, g_date_time.minute);

@@ -175,6 +175,7 @@ void humid_rak14000(bool has_pm, bool has_baro);
 void baro_rak14000(bool has_pm);
 void co2_rak14000(bool has_pm);
 void pm_rak14000(void);
+void light_rak14000(bool has_pm);
 void status_ui_rak14000(void);
 void rak14000_start_screen(bool startup = true);
 void rak14000_switch_bg(void);

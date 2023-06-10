@@ -231,6 +231,7 @@ void app_event_handler(void)
 		MYLOG("APP", "Wakeup Status");
 		if (!g_is_using_battery)
 		{
+			power_modules(true);
 			g_task_event_type |= SEND_NOW;
 		}
 		else

@@ -48,6 +48,14 @@ bool init_rak12037(void)
  */
 void read_rak12037(void)
 {
+	// Change number of seconds between measurements: 2 to 1800 (30 minutes), stored in non-volatile memory of SCD30
+	scd30.setMeasurementInterval(2);
+	// Enable self calibration
+	scd30.setAutoSelfCalibration(true);
+
+	// Start the measurements
+	scd30.beginMeasuring();
+
 	time_t start_time = millis();
 	while (!scd30.dataAvailable())
 	{
@@ -65,6 +73,25 @@ void read_rak12037(void)
 	float temp_reading = scd30.getTemperature();
 	float humid_reading = scd30.getHumidity();
 
+	if (co2_reading == 0)
+	{
+		start_time = millis();
+		while (!scd30.dataAvailable())
+		{
+			MYLOG("SCD30", "Waiting again for data");
+			delay(500);
+			if ((millis() - start_time) > 10000)
+			{
+				// timeout, no data available
+				MYLOG("SCD30", "Timeout 2");
+				return;
+			}
+		}
+		co2_reading = scd30.getCO2();
+		temp_reading = scd30.getTemperature();
+		humid_reading = scd30.getHumidity();
+		MYLOG("SCD30", "Second reading");
+	}
 	MYLOG("SCD30", "CO2 level %dppm", co2_reading);
 	MYLOG("SCD30", "Temperature %.2f", temp_reading);
 	MYLOG("SCD30", "Humidity %.2f", humid_reading);
