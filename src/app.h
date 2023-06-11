@@ -76,6 +76,8 @@ void change_sendinterval(void);
 extern SoftwareTimer delayed_sending;
 void send_delayed(TimerHandle_t unused);
 void do_rgb_toggle(TimerHandle_t unused);
+uint8_t get_min_dr(uint16_t region, uint16_t payload_size);
+bool check_dr_valid(uint16_t payload_size);
 
 extern uint8_t g_last_fport;
 // extern bool g_no_usb;

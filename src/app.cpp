@@ -129,9 +129,6 @@ bool init_app(void)
 	init_rak14000();
 #endif
 
-	// Initialize the User AT command list
-	init_user_at();
-
 	delay(500);
 	// Scan the I2C interfaces for devices
 	find_modules();
@@ -140,6 +137,9 @@ bool init_app(void)
 	announce_modules();
 
 	AT_PRINTF("===============================================\n");
+
+	// Initialize the User AT command list
+	init_user_at();
 
 	Serial.flush();
 	// Reset the packet
@@ -271,6 +271,7 @@ void app_event_handler(void)
 		refresh_rak14000();
 #else
 		// No display detected, set RGB color
+		MYLOG("APP", "Refresh RGB");
 		set_rgb_air_status();
 #endif
 
@@ -280,6 +281,23 @@ void app_event_handler(void)
 		{
 			if (g_lpwan_has_joined)
 			{
+				/*******************************************************************************************************************/
+				// Experimental, choose the smallest DR that will fit the payload size.
+				uint8_t proposed_dr = get_min_dr(g_lorawan_settings.lora_region, g_solution_data.getSize());
+				if (proposed_dr != 16)
+				{
+					lmh_datarate_set(proposed_dr, g_lorawan_settings.adr_enabled);
+					MYLOG("APP", "Using DR %d", proposed_dr);
+
+					// Double check if the DR is ok (potentially there are added MAC commands)
+					if (!check_dr_valid(g_solution_data.getSize()))
+					{
+						lmh_datarate_set(proposed_dr + 1, g_lorawan_settings.adr_enabled);
+						MYLOG("APP", "Adjusted DR %d", proposed_dr + 1);
+					}
+				}
+				/*******************************************************************************************************************/
+
 				lmh_error_status result = send_lora_packet(g_solution_data.getBuffer(), g_solution_data.getSize());
 				switch (result)
 				{
@@ -293,6 +311,8 @@ void app_event_handler(void)
 				case LMH_ERROR:
 					AT_PRINTF("+EVT:SIZE_ERROR\n");
 					MYLOG("APP", "Packet error, too big to send with current DR");
+					lmh_datarate_set(proposed_dr+1, g_lorawan_settings.adr_enabled);
+					send_lora_packet(g_solution_data.getBuffer(), g_solution_data.getSize());
 					break;
 				}
 			}

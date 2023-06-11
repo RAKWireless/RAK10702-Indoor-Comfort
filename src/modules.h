@@ -199,6 +199,8 @@ void startup_rak12019(void);
 void shut_down_rak12019(void);
 void startup_rak12037(void);
 void shut_down_rak12037(void);
+bool force_calib_rak12037(uint16_t _concentration);
+uint16_t get_calib_rak12037(void);
 void startup_rak12039(void);
 void shut_down_rak12039(void);
 
@@ -219,7 +221,7 @@ extern bool g_occupied;
 // Button stuff
 void init_button(void);
 void check_button(void);
-#ifdef _CUSTOM_BOARD_
+#if _CUSTOM_BOARD_ > 0
 #define BUTTON_INT 24 // WB_I2C2_SDA
 #else
 #define BUTTON_INT WB_SW1

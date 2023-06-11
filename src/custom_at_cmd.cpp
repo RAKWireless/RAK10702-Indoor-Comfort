@@ -240,7 +240,68 @@ static int at_query_rtc(void)
 atcmd_t g_user_at_cmd_list_rtc[] = {
 	/*|    CMD    |     AT+CMD?      |    AT+CMD=?    |  AT+CMD=value |  AT+CMD  | Permissions |*/
 	// RTC commands
-	{"+RTC", "Get/Set RTC time and date", at_query_rtc, at_set_rtc, at_query_rtc, "RW"},
+	{"+RTC", "Get/Set RTC time and date", at_query_rtc, at_set_rtc, NULL, "RW"},
+};
+
+/*****************************************
+ * Set CO2 commands
+ *****************************************/
+
+/**
+ * @brief Force calibration of CO2 sensor
+ *
+ * @param str selected UI as String, allowed values 400 to 2000 ppm
+ * @return int AT_SUCCESS if ok, AT_ERRNO_PARA_FAIL if invalid value
+ */
+static int at_set_co2(char *str)
+{
+	long new_cal = strtol(str, NULL, 0);
+
+	if ((new_cal < 400) || (new_cal > 2000))
+	{
+		return AT_ERRNO_PARA_NUM;
+	}
+
+	// Make sure the RAK12037 is powered up
+	power_modules(true);
+	delay(500);
+
+	if (force_calib_rak12037(new_cal))
+	{
+		return AT_SUCCESS;
+	}
+	return AT_ERRNO_EXEC_FAIL;
+}
+
+/**
+ * @brief Get current CO2 calibration value
+ *
+ * @return int AT_SUCCESS
+ */
+int at_query_co2(void)
+{
+	// Make sure the RAK12037 is powered up
+	power_modules(true);
+	delay(500);
+
+	uint16_t current_calib_value = get_calib_rak12037();
+	if (current_calib_value == 0)
+	{
+		AT_PRINTF("ERROR reading calibration");
+		return AT_ERRNO_EXEC_FAIL;
+	}
+	AT_PRINTF("%d", get_calib_rak12037());
+	return AT_SUCCESS;
+}
+
+/**
+ * @brief List of all available commands with short help and pointer to functions
+ *
+ */
+atcmd_t g_user_at_cmd_list_co2[] = {
+	/*|    CMD    |     AT+CMD?      |    AT+CMD=?    |  AT+CMD=value |  AT+CMD  | Permissions |*/
+	// Module commands
+	{"+CO2", "Set CO2 calibration value, 400 ... 2000ppm", at_query_co2, at_set_co2, NULL, "RW"},
 };
 
 /** Number of user defined AT commands */
@@ -257,18 +318,25 @@ atcmd_t *g_user_at_cmd_list;
  */
 void init_user_at(void)
 {
+	// Get required size of structure
 	uint16_t index_next_cmds = 0;
 	uint16_t required_structure_size = sizeof(g_user_at_cmd_list_modules);
 	MYLOG("USR_AT", "Structure size %d Modules", required_structure_size);
 	required_structure_size += sizeof(g_user_at_cmd_list_ui);
 	MYLOG("USR_AT", "Structure size %d UI", required_structure_size);
 
-	// Get required size of structure
 	if (has_rak12002)
 	{
 		required_structure_size += sizeof(g_user_at_cmd_list_rtc);
 
 		MYLOG("USR_AT", "Structure size %d RTC", required_structure_size);
+	}
+
+	if (has_rak12037)
+	{
+		required_structure_size += sizeof(g_user_at_cmd_list_co2);
+
+		MYLOG("USR_AT", "Structure size %d CO2", required_structure_size);
 	}
 
 	// Reserve memory for the structure
@@ -293,5 +361,14 @@ void init_user_at(void)
 		memcpy((void *)&g_user_at_cmd_list[index_next_cmds], (void *)g_user_at_cmd_list_rtc, sizeof(g_user_at_cmd_list_rtc));
 		index_next_cmds += sizeof(g_user_at_cmd_list_rtc) / sizeof(atcmd_t);
 		MYLOG("USR_AT", "Index after adding RTC %d", index_next_cmds);
+	}
+
+	if (has_rak12037)
+	{
+		MYLOG("USR_AT", "Adding CO2 user AT commands");
+		g_user_at_cmd_num += sizeof(g_user_at_cmd_list_co2) / sizeof(atcmd_t);
+		memcpy((void *)&g_user_at_cmd_list[index_next_cmds], (void *)g_user_at_cmd_list_co2, sizeof(g_user_at_cmd_list_co2));
+		index_next_cmds += sizeof(g_user_at_cmd_list_co2) / sizeof(atcmd_t);
+		MYLOG("USR_AT", "Index after adding CO2 %d", index_next_cmds);
 	}
 }

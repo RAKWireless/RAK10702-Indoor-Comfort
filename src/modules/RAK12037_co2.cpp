@@ -31,8 +31,17 @@ bool init_rak12037(void)
 	//**************init SCD30 sensor *****************************************************
 	// Change number of seconds between measurements: 2 to 1800 (30 minutes), stored in non-volatile memory of SCD30
 	scd30.setMeasurementInterval(2);
+
+	/// \todo is this a good idea? Disabled self calibration for now, because
+	//   "When activated for the first time a
+    // period of minimum 7 days is needed so that the algorithm can find its initial parameter set for ASC. The sensor has to be exposed
+    // to fresh air for at least 1 hour every day. Also during that period, the sensor may not be disconnected from the power supply,
+    // otherwise the procedure to find calibration parameters is aborted and has to be restarted from the beginning. The successfully
+    // calculated parameters are stored in non-volatile memory of the SCD30 having the effect that after a restart the previously found
+    // parameters for ASC are still present. "
+
 	// Enable self calibration
-	scd30.setAutoSelfCalibration(true);
+	// scd30.setAutoSelfCalibration(true);
 
 	// Start the measurements
 	scd30.beginMeasuring();
@@ -137,4 +146,31 @@ void shut_down_rak12037(void)
 #else
 	scd30.StopMeasurement();
 #endif
+}
+
+/**
+ * @brief Set the calibration concentration manually
+ *
+ * @param _concentration CO2 concentration has to be within the range 400 ppm ≤ cref(CO2) ≤ 2000 ppm
+ * @return true if successful
+ * @return false if failed
+ */
+bool force_calib_rak12037(uint16_t _concentration)
+{
+	return scd30.setForcedRecalibrationFactor(_concentration);
+}
+
+/**
+ * @brief Get the current calibration concentration
+ * 
+ * @return uint16_t calibration value 400 ... 2000 ppm or 0 if request failed
+ */
+uint16_t get_calib_rak12037(void)
+{
+	uint16_t set_calib = 0;
+	if (! scd30.getForcedRecalibration(&set_calib))
+	{
+		return 0;
+	}
+	return set_calib;
 }
