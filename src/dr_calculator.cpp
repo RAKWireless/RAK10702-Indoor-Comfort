@@ -42,11 +42,11 @@ uint8_t get_min_dr(uint16_t region, uint16_t payload_size)
 	MYLOG("DR_CALC", "Got region %d and payload size %d", region, payload_size);
 	// Get the datarate - payload size map
 	uint16_t *region_ps = region_map[region];
-	MYLOG("DR_CALC", "Available packet sizes:");
-	for (int idx = 0; idx < 15; idx++)
-	{
-		Serial.printf("DR %d max size %d\n", idx, region_ps[idx]);
-	}
+	// MYLOG("DR_CALC", "Available packet sizes:");
+	// for (int idx = 0; idx < 15; idx++)
+	// {
+	// 	Serial.printf("DR %d max size %d\n", idx, region_ps[idx]);
+	// }
 	// Go through all payload sizes
 	for (uint8_t idx = 0; idx < 16; idx++)
 	{

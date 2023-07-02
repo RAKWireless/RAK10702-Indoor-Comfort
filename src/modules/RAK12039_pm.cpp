@@ -18,6 +18,10 @@ RAK_PMSA003I PMSA003I;
 /** Data structure */
 PMSA_Data_t data;
 
+// Forward declarations
+uint16_t normalize_std_val(uint16_t org_val);
+uint16_t normalize_env_val(uint16_t org_val);
+
 /**
  * @brief Initialize the PMSA003I sensor
  *
@@ -76,14 +80,14 @@ void read_rak12039(void)
 
 		MYLOG("PMS", "PMSA003I read date success.");
 
-		g_solution_data.addVoc_index(LPP_CHANNEL_PM_1_0, data.pm10_env);
-		g_solution_data.addVoc_index(LPP_CHANNEL_PM_2_5, data.pm25_env);
-		g_solution_data.addVoc_index(LPP_CHANNEL_PM_10_0, data.pm100_env);
+		g_solution_data.addVoc_index(LPP_CHANNEL_PM_1_0, normalize_env_val(data.pm10_env));
+		g_solution_data.addVoc_index(LPP_CHANNEL_PM_2_5, normalize_env_val(data.pm25_env));
+		g_solution_data.addVoc_index(LPP_CHANNEL_PM_10_0, normalize_env_val(data.pm100_env));
 
-		MYLOG("PMS", "Std PM ug/m3: PM 1.0 %d PM 2.5 %d PM 10 %d", data.pm10_standard, data.pm25_standard, data.pm100_standard);
-		MYLOG("PMS", "Env PM ug/m3: PM 1.0 %d PM 2.5 %d PM 10 %d", data.pm10_env, data.pm25_env, data.pm100_env);
+		MYLOG("PMS", "Std PM ug/m3: PM 1.0 %d PM 2.5 %d PM 10 %d", normalize_std_val(data.pm10_standard), normalize_std_val(data.pm25_standard), normalize_std_val(data.pm100_standard));
+		MYLOG("PMS", "Env PM ug/m3: PM 1.0 %d PM 2.5 %d PM 10 %d", normalize_env_val(data.pm10_env), normalize_env_val(data.pm25_env), normalize_env_val(data.pm100_env));
 #if HAS_EPD == 1 || HAS_EPD == 4
-		set_pm_rak14000(data.pm10_env, data.pm25_env, data.pm100_env);
+		set_pm_rak14000(normalize_env_val(data.pm10_env), normalize_env_val(data.pm25_env), normalize_env_val(data.pm100_env));
 #endif
 	}
 	else
@@ -146,4 +150,56 @@ void shut_down_rak12039(void)
 	digitalWrite(SET_PIN, LOW); // Sensor off
 	MYLOG("PMS", "RAK12039 fan off");
 #endif
+}
+
+/**
+ * @brief Normalize standard sensor value with formula given by the manufacturer
+ *
+ * @param org_val value from sensor
+ * @return uint16_t Normalized value
+ */
+uint16_t normalize_std_val(uint16_t org_val)
+{
+	float _org_val = org_val * 1.0;
+
+	// org_val less than 1
+	if (org_val <= 1)
+	{
+		return 1;
+	}
+
+	// org_val between 1 and 896
+	if ((org_val > 1) && org_val <= 896)
+	{
+		return (uint16_t)((1 / (1.585325 / _org_val - 0.0009357)) * 1.08);
+	}
+
+	// org_val > 896
+	return 304 + org_val;
+}
+
+/**
+ * @brief Normalize environment sensor value with formula given by the manufacturer
+ *
+ * @param org_val value from sensor
+ * @return uint16_t Normalized value
+ */
+uint16_t normalize_env_val(uint16_t org_val)
+{
+	float _org_val = org_val * 1.0;
+
+	// org_val less than 1
+	if (org_val <= 1)
+	{
+		return 1;
+	}
+
+	// org_val between 1 and 583
+	if ((org_val > 1) && org_val <= 583)
+	{
+		return (uint16_t)((1 / (1.061263 / _org_val - 0.0009423)) * 1.08);
+	}
+
+	// org_val > 583
+	return 618 + org_val;
 }

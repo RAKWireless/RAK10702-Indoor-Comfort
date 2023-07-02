@@ -206,6 +206,12 @@ bool init_app(void)
 		power_i2c(false);
 		power_modules(false);
 	}
+
+#if _CUSTOM_BOARD_ == 0
+	// Need manual start of BLE advertising because of mistake in WisBlock-API-V2
+	restart_advertising(60);
+#endif
+
 	return true;
 }
 
@@ -229,6 +235,10 @@ void app_event_handler(void)
 	{
 		g_task_event_type &= N_STATUS;
 		MYLOG("APP", "Wakeup Status");
+		if (has_rak1906)
+		{
+			start_rak1906();
+		}
 		if (!g_is_using_battery)
 		{
 			power_modules(true);
@@ -311,7 +321,7 @@ void app_event_handler(void)
 				case LMH_ERROR:
 					AT_PRINTF("+EVT:SIZE_ERROR\n");
 					MYLOG("APP", "Packet error, too big to send with current DR");
-					lmh_datarate_set(proposed_dr+1, g_lorawan_settings.adr_enabled);
+					lmh_datarate_set(proposed_dr + 1, g_lorawan_settings.adr_enabled);
 					send_lora_packet(g_solution_data.getBuffer(), g_solution_data.getSize());
 					break;
 				}
@@ -448,7 +458,7 @@ void app_event_handler(void)
 	}
 
 	if (switch_power_off)
-	{ 
+	{
 		// Shut down I2C
 		power_i2c(false);
 	}

@@ -48,8 +48,10 @@ void find_modules(void)
 	init_rgb();
 	set_rgb_color(246, 190, 0); //
 
-	// Init PIR
+#if _CUSTOM_BOARD_ == 1
+	// Init PIR (only RAK19024)
 	init_pir();
+#endif
 
 	// BUTTON
 	init_button();
@@ -275,11 +277,11 @@ void get_sensor_values(void)
 		read_rak12039();
 	}
 
-		if (has_rak12047)
-		{
-			// Get the voc sensor values
-			read_rak12047();
-		}
+	if (has_rak12047)
+	{
+		// Get the voc sensor values
+		read_rak12047();
+	}
 }
 
 /**

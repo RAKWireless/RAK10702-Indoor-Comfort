@@ -3,22 +3,28 @@
 | --- | --- | --- |     
 
 This tutorial shows how to build a indoor air quality sensor with the WisBlock eco system.    
-With the release of the new RAK12037 CO2 and RAK12039 Particle Matter sensor the most important air quality indizes can now be measured.    
-The final device in this tutorial is measuring CO2, Particle Matter, VOC, temperature, humidity and barometric pressure. It can be comined with the RAK14000 to display the different values. But more important, it sends the measured values over LoRaWAN for further processing and taking actions.    
+With the RAK12037 CO2 and RAK12039 Particle Matter sensor the most important air quality indizes can be measured.    
+The final device in this tutorial is measuring CO2, Particle Matter, VOC, temperature, humidity and barometric pressure. It can be comined with the RAK14000 to display the different values. But more important, it sends the measured values over LoRaWAN or LoRa P2P for further processing and taking actions.    
 
 ### _REMARK 1_     
 This firmware is using the [WisBlock API V2](https://github.com/beegee-tokyo/WisBlock-API-V2) ⤴️ which helps to create low power consumption application and taking the load to handle communications from your shoulder.    
 
 ### _REMARK 2_
-For the displays, the RAK14000 EPD module with the 2.13" display can be used. But for better visualization this code supports as well a 3.52" and a 4.2" display. The 4.2" display might be added as a variant to the WisBlock RAK14000 in the future.
+For the displays, the RAK14000 EPD module with a 4.2" display is used.    
 
 ----
 
 # Content
-- [Hardware supported](#hardware_supported)
-- [Software used](#software_used)
-- [How to use it](#how_to_use_it)
-- [Packet data format](#packet_data_format)
+- [Hardware supported](#hardware-supported)
+- [Software used](#software-used)
+- [How to use it](#how-to-use-it)
+   - [Selection of used sensors](#selection-of-used-sensors)
+   - [Selection of default UI](#selection-of-default-ui)
+   - [RTC usage](#rtc-usage)
+   - [CO2 sensor calibration](#co2-sensor-calibration)
+   - [Setup the LPWAN credentials](#setup-the-lpwan-credentials-with-one-of-the-options:)
+- [Button functions](#button-functions)
+- [Packet data format](#packet-data-format)
 - [Compiler Flags](#compiler-flags)
    - [Versioning](#versioning)
    - [Debug options](#debug-options)
@@ -28,25 +34,26 @@ For the displays, the RAK14000 EPD module with the 2.13" display can be used. Bu
    - [Usage of Bosch BSEC library](#usage-of-bosch-bsec-library)
 - [Example for a visualization and alert message](#example-for-a-visualization-and-alert-message)
 
-<center><img src = "./assets/Air-Quality-4.jpg" alt = "Mounting" width = 50%></center>
+<center><img src = "./assets/Air-Quality-4.jpg" alt = "Icon Display" width = 50%></center>
 
 ----
 
 # Hardware supported
 | Module | Function |
 | --     | --       |
-| [RAK4631](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK4631/Overview/) ⤴️ | WisBlock Core module |
-| [RAK19001](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK19001/Overview/) ⤴️ | WisBlock Fullsize Base board |
-| [RAK1901](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK1901/Overview/) ⤴️ | WisBlock Temperature and Humidty Sensor |
-| [RAK1902](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK1902/Overview/) ⤴️ | WisBlock Barometer Pressure Sensor |
-| [RAK1906](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK1906/Overview/) ⤴️ | WisBlock Environment Sensor |
-| [RAK12002](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK12002/Overview/) ⤴️ | WisBlock RTC module |
-| [RAK12010](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK12010/Overview/) ⤴️ | WisBlock Ambient Light sensor |
-| [RAK12019](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK12019/Overview/) ⤴️ | WisBlock UV Light sensor |
-| [RAK12037](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK12037/Overview/) ⤴️ | WisBlock CO2 sensor |
-| [RAK12039](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK12039/Overview/) ⤴️ | WisBlock Particle Matter sensor |
-| [RAK12047](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK12047/Overview/) ⤴️ | WisBlock VOC sensor |
-| [RAK14000](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK14000/Overview/) ⤴️ | WisBlock EPD |
+| [RAK4630](https://docs.rakwireless.com/Product-Categories/WisDuo/RAK4630-Module/Overview/) ⤴️ | WisDuo module |
+| [RAK19024](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK19024/Overview/) ⤴️ | Custom WisBlock Base board with 3 IO slots |
+| [RAK1901](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK1901/Overview/) ⤴️ | WisBlock Temperature and Humidty Sensor Sensirion SHTC3 |
+| [RAK1902](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK1902/Overview/) ⤴️ | WisBlock Barometer Pressure Sensor ST LPS22HB |
+| [RAK1903](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK1903/Overview/) ⤴️ | WisBlock Light Sensor TI OPT3001 |
+| [RAK1906](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK1906/Overview/) ⤴️ | WisBlock Environment Sensor Bosch BME680 |
+| [RAK12002](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK12002/Overview/) ⤴️ | WisBlock RTC module Micro Crystal RV-3028-C7 |
+| [RAK12010](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK12010/Overview/) ⤴️ | WisBlock Ambient Light sensor Vishay Semiconductors VEML7700 |
+| [RAK12019](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK12019/Overview/) ⤴️ | WisBlock UV Light sensor Lite-On LTR-390UV-01|
+| [RAK12037](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK12037/Overview/) ⤴️ | WisBlock CO2 sensor Sensirion SCD30 |
+| [RAK12039](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK12039/Overview/) ⤴️ | WisBlock Particle Matter sensor Plantower PMSA003I |
+| [RAK12047](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK12047/Overview/) ⤴️ | WisBlock VOC sensor Sensirion SGP40 |
+| [RAK14000](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK14000/Overview/) ⤴️ | WisBlock EPD with custom 4.2" display |
 
 ----
 
@@ -91,11 +98,159 @@ When using PlatformIO, the libraries are all listed in the **`platformio.ini`** 
 # How to use it
 Compile the firmware and flash it on a WisBlock with all required modules installed.
 
+## Selection of used sensors
+
+The firmware is automatically detecting the connected sensors and is changing the sensor readings and the payload format based on the found sensors.
+
+## Selection of default UI
+
+The default UI can be set with an AT command.
+
+| Command                       | Input Parameter                    | Return Value                                               | Return Code              |
+| ----------------------------- | ---------------------------------- | ---------------------------------------------------------- | ------------------------ |
+| ATC+UI?                       | -                                  | `ATC+UI:"Switch display UI, 0 = scientific, 1 = iconized"` | `OK`                     |
+| ATC+UI=?                      | -                                  | *<current UI>*                                             | `OK`                     |
+| ATC+UI=`<Input Parameter>`    | *<0 = scientific, 1 = iconized>*   | -                                                          | `OK` or `AT_PARAM_ERROR` |
+
+**Examples**:
+
+Check function
+```log
+ATC+UI?
+
+ATC+UI:"Switch display UI, 0 = scientific, 1 = iconized"
+
+OK
+```
+
+Get current default
+
+```log
+ATC+UI=?
+
+1
+
+OK
+```
+
+Set new default
+
+```log
+ATC+UI=1
+
+OK
+```
+
+Wrong selection
+
+```log
+
+ATC+UI=3
+
++CME ERROR:6
+```
+
+## RTC usage
+
+If the RAK12002 RTC module is used, an additional user AT command is available to set the RTC time and date. 
+
+| Command                       | Input Parameter | Return Value                                               | Return Code              |
+| ----------------------------- | --------------- | ---------------------------------------------------------- | ------------------------ |
+| ATC+RTC?                      | -               | `ATC+RTC:"Get/Set RTC time and date"` | `OK`               |
+| ATC+RTC=?                     | -               | *<date & time>*                                            | `OK`                     |
+| ATC+RTC=`<Input Parameter>`   | *<date & time>* | -                                                        | `OK` or `AT_PARAM_ERROR` |
+
+**Examples**:
+
+Check function
+```log
+ATC+RTC?
+
+ATC+RTC:"Get/Set RTC time and date"
+
+OK
+```
+
+Get time
+
+```log
+ATC+RTC=?
+
+2023.07.02 20:44:45
+
+OK
+```
+
+Set time
+
+```log
+ATC+RTC=2023:7:2:20:49
+
+OK
+```
+
+Wrong time format
+
+```log
+
+ATC+RTC=2023:7:2:25:61
+
++CME ERROR:6
+```
+
+## CO2 sensor calibration
+
+The SCD30 CO2 sensor from Sensirion has a calibration function. If the sensor results are not within the expected range, the CO2 sensor can be calibrated with a value retrieved from a calibration device.
+
+| Command                       | Input Parameter | Return Value                                               | Return Code              |
+| ----------------------------- | --------------- | ---------------------------------------------------------- | ------------------------ |
+| ATC+CO2?                      | -               | `ATC+CO2:"Set CO2 calibration value, 400 ... 2000ppm"`     | `OK`               |
+| ATC+CO2=?                     | -               | *<calibration>*                                            | `OK`                     |
+| ATC+CO2=`<Input Parameter>`   | *<calibration>* | -                                                          | `OK` or `AT_PARAM_ERROR` |
+
+**Examples**:
+
+Check function
+```log
+ATC+CO2?
+
+ATC+CO2:"Set CO2 calibration value, 400 ... 2000ppm"
+
+OK
+```
+
+Get current calibration value
+
+```log
+ATC+CO2=?
+
+400
+
+OK
+```
+
+Set new calibration value
+
+```log
+ATC+CO2=400
+
+OK
+```
+
+Wrong calibration value
+
+```log
+
+ATC+CO2=2300
+
++CME ERROR:6
+```
+
 ## Setup the LPWAN credentials with one of the options:
 
 ### Over USB
 
-Connect over USB to setup the LPWAN credentials. Use the DevEUI printed on the RAK4631, use the AppEUI and AppKey from your LPWAN server. Do NOT activate automatic join yet. As weather sensor levels are not changing very fast, it might be sufficient to set the send frequency to every 10 minutes. The send frequency is set in seconds, so the value would be  10 * 60 ==> 600
+Connect over USB to setup the LPWAN credentials. Use the DevEUI printed on the RAK4630, use the AppEUI and AppKey from your LPWAN server. Do NOT activate automatic join yet. As weather sensor levels are not changing very fast, it might be sufficient to set the send frequency to every 10 minutes. The send frequency is set in seconds, so the value would be  10 * 60 ==> 600
 
 The AT commands are compatible with RAKwireless RUI3 AT commands. Not all AT commands are supported due to the differences in the LoRaWAN stack.    
 See [AT Command Manual](https://docs.rakwireless.com/RUI3/Serial-Operating-Modes/AT-Command-Manual/)
@@ -133,6 +288,21 @@ Use the [WisBlock Toolbox](https://play.google.com/store/apps/details?id=tk.gies
 Alternative the [RAKwireless WisToolBox](https://docs.rakwireless.com/Product-Categories/Software-Tools/WisToolBox/Overview/) ⤴️ can be used.    
 WisToolBox makes it easy to setup all required parameters through a simple user interface. _**(Work in progress, not all functions available)**_    
       
+----
+
+# Button functions
+
+The button on the front of the device has multiple functions:
+
+| Push | Function |
+| --- | --- |
+| 1 time | switch between display versions, technical and simplified (with status icon) |
+| 2 times | switch between black on white and white on black display |
+| 3 times | enable BLE for debug, setup of firmware upgrade over BLE |
+| 4 times | show device settings and LoRa P2P or LoRaWAN settings and credentials |
+| 9 times | reboot the device |
+
+
 ----
 
 # Packet data format
@@ -188,7 +358,7 @@ The content of the packet depends on the modules installed on the WisBlock Base 
 ### _REMARK_
 Channel ID's in cursive are extended format and not supported by standard Cayenne LPP data decoders.
 
-Example decoder [RAKwireless_Standardized_Payload.js] for TTN, Chirpstack, Helium and Datacake can be found in the folder [RAKwireless_Standardized_Payload](https://github.com/RAKWireless/RAKwireless_Standardized_Payload) repo. ⤴️
+Example decoder RAKwireless_Standardized_Payload.js for TTN, Chirpstack, Helium and Datacake can be found in the folder [RAKwireless_Standardized_Payload](https://github.com/RAKWireless/RAKwireless_Standardized_Payload) repo. ⤴️
 
 ### _REMARK_
 If using LoRa P2P, a special packet is included the contains the last 4 bytes of the devices Dev EUI. This way in LoRa P2P the "gateway" can determine which node sent the packet.
@@ -234,7 +404,7 @@ As an simple example to visualize the IAQ data and sending an alert, I created a
 Datacake is an easy to use _**Low Code IoT Platform**_. In my Datacake account I setup the device with the matching payload decoder, visualization and creation of an email alert.
 
 ## Datacake payload decoder
-In the device configuration the Datacake decoder from the [_**decoders**_](./decoders) folder is used.
+Example decoder RAKwireless_Standardized_Payload.js for TTN, Chirpstack, Helium and Datacake can be found in the folder [RAKwireless_Standardized_Payload](https://github.com/RAKWireless/RAKwireless_Standardized_Payload) repo. ⤴️
 
 ## Datacake fields
 
@@ -252,5 +422,8 @@ In the device configuration the Datacake decoder from the [_**decoders**_](./dec
 
 ## Datacake visualization
 
-![Datacake Rule](./assets/datacake-dashboard.png)
+![Datacake Dashboard](./assets/datacake-dashboard.png)
+
+A sample collection of multiple RAK10702 and other RAKwireless devices can be found in this [Datacake Dashboard](https://app.datacake.de/dashboard/d/6f0b76ce-ccbc-4cb3-ace9-9968a557f760)
+
 

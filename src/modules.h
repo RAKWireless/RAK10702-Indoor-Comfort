@@ -236,11 +236,19 @@ void save_batt_settings(bool check_batt_enables);
 void read_ui_settings(void);
 void save_ui_settings(uint8_t ui_selected);
 
+#if _CUSTOM_BOARD_ > 0
 #define VOC_POWER 20	// PIN_SERIAL2_TX
 #define PIR_POWER 2		// PIN_AREF
 #define CO2_PM_POWER 28 // PIN_A2
 #define EPD_POWER 34	// WB_IO2
 #define SET_PIN WB_IO6
+#else
+#define VOC_POWER WB_IO2
+#define PIR_POWER WB_IO2
+#define CO2_PM_POWER WB_IO2 
+#define EPD_POWER WB_IO2
+#define SET_PIN WB_IO6 
+#endif
 
 extern bool g_sensors_off;
 #endif

@@ -107,6 +107,8 @@ void read_rak12037(void)
 
 	g_solution_data.addConcentration(LPP_CHANNEL_CO2_2, co2_reading);
 
+	scd30.StopMeasurement();
+
 #if HAS_EPD > 0
 	set_co2_rak14000(co2_reading);
 #endif
@@ -121,6 +123,7 @@ void startup_rak12037(void)
 #if SENSOR_POWER_OFF > 0
 	// Power up the sensor
 	digitalWrite(CO2_PM_POWER, HIGH); // power off RAK12037
+	delay(100);
 	init_rak12037();
 #else
 	// Change number of seconds between measurements: 2 to 1800 (30 minutes), stored in non-volatile memory of SCD30
@@ -140,11 +143,10 @@ void startup_rak12037(void)
  */
 void shut_down_rak12037(void)
 {
+	scd30.StopMeasurement();
 #if SENSOR_POWER_OFF > 0
 	// Disable power
 	digitalWrite(CO2_PM_POWER, LOW); // power off RAK12037
-#else
-	scd30.StopMeasurement();
 #endif
 }
 
