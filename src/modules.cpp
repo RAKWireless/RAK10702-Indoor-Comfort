@@ -295,16 +295,18 @@ void power_i2c(bool switch_on)
 	{
 		digitalWrite(EPD_POWER, HIGH);
 		delay(100);
-		// Wire.begin();
+		Wire.begin();
 	}
 	else
 	{
 		digitalWrite(EPD_POWER, LOW);
-		// Wire.end();
+		Wire.end();
+		pinMode(WB_I2C1_SDA, INPUT_PULLUP);
+		pinMode(WB_I2C1_SCL, INPUT_PULLUP);
 		// pinMode(WB_I2C1_SDA, OUTPUT_D0S1);
 		// pinMode(WB_I2C1_SCL, OUTPUT_D0S1);
-		// digitalWrite(WB_I2C1_SDA, LOW);
-		// digitalWrite(WB_I2C1_SCL, LOW);
+		// digitalWrite(WB_I2C1_SDA, HIGH);
+		// digitalWrite(WB_I2C1_SCL, HIGH);
 	}
 }
 

@@ -158,17 +158,17 @@ bool init_app(void)
 
 	rgb_toggle.begin(15000, do_rgb_toggle, NULL, false);
 	// If on battery usage, start timer to switch off the RGB LED
-	if (g_has_rgb)
+	if (g_is_using_battery)
 	{
-		if (g_is_using_battery)
+		MYLOG("APP", "Device is battery powered!");
+		if (g_has_rgb)
 		{
-			MYLOG("APP", "Device is battery powered!");
 			rgb_toggle.start();
 		}
-		else
-		{
-			MYLOG("APP", "Device is external powered!");
-		}
+	}
+	else
+	{
+		MYLOG("APP", "Device is external powered!");
 	}
 
 	// Prepare timer to send after the sensors were awake for 30 seconds
@@ -199,12 +199,15 @@ bool init_app(void)
 			api_wake_loop(STATUS);
 			MYLOG("APP", "LoRaWAN send interval is 0");
 		}
+		MYLOG("APP", "LoRaWAN send interval is %ld s", g_lorawan_settings.send_repeat_time / 1000);
 	}
 
 	if (g_is_using_battery)
 	{
-		power_i2c(false);
 		power_modules(false);
+		power_i2c(false);
+		MYLOG("APP", "Modules powered down");
+		Serial.flush();
 	}
 
 #if _CUSTOM_BOARD_ == 0
@@ -377,6 +380,7 @@ void app_event_handler(void)
 		{
 			MYLOG("APP", "VOC power up I2C");
 			power_i2c(true);
+			switch_power_off = true;
 		}
 		MYLOG("APP", "Handle VOC");
 		do_read_rak12047();

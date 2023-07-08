@@ -32,6 +32,7 @@ bool init_rak12039(void)
 {
 	// On/Off control pin
 	pinMode(SET_PIN, OUTPUT);
+	pinMode(WB_IO5, INPUT_PULLUP);
 
 	// Sensor on
 	digitalWrite(SET_PIN, HIGH);
@@ -107,10 +108,15 @@ void startup_rak12039(void)
 #if SENSOR_POWER_OFF > 0
 	// Sensor on
 	digitalWrite(CO2_PM_POWER, HIGH); // power on RAK12039
-#else
-	digitalWrite(SET_PIN, HIGH);
 #endif
 
+	pinMode(SET_PIN, OUTPUT);
+	digitalWrite(SET_PIN, HIGH);
+
+#if SENSOR_POWER_OFF > 0
+	// Init Sensor
+	init_rak12039();
+#else
 	// Wait for wakeup
 	time_t wait_sensor = millis();
 	MYLOG("PMS", "RAK12039 wake-up scan start %ld ms", millis());
@@ -131,9 +137,6 @@ void startup_rak12039(void)
 			break;
 		}
 	}
-#if SENSOR_POWER_OFF > 0
-	// Init Sensor
-	init_rak12039();
 #endif
 }
 
@@ -146,6 +149,7 @@ void shut_down_rak12039(void)
 #if SENSOR_POWER_OFF > 0
 	// Disable power
 	digitalWrite(CO2_PM_POWER, LOW); // power off RAK12039
+	pinMode(SET_PIN, INPUT_PULLUP);
 #else
 	digitalWrite(SET_PIN, LOW); // Sensor off
 	MYLOG("PMS", "RAK12039 fan off");
