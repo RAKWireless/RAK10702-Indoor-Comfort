@@ -40,8 +40,8 @@ bool init_rak12037(void)
     // calculated parameters are stored in non-volatile memory of the SCD30 having the effect that after a restart the previously found
     // parameters for ASC are still present. "
 
-	// Enable self calibration
-	// scd30.setAutoSelfCalibration(true);
+	// Disable self calibration
+	scd30.setAutoSelfCalibration(false);
 
 	// Start the measurements
 	scd30.beginMeasuring();
@@ -59,8 +59,8 @@ void read_rak12037(void)
 {
 	// Change number of seconds between measurements: 2 to 1800 (30 minutes), stored in non-volatile memory of SCD30
 	scd30.setMeasurementInterval(2);
-	// Enable self calibration
-	scd30.setAutoSelfCalibration(true);
+	// Disable self calibration
+	scd30.setAutoSelfCalibration(false);
 
 	// Start the measurements
 	scd30.beginMeasuring();
@@ -122,15 +122,15 @@ void startup_rak12037(void)
 {
 #if SENSOR_POWER_OFF > 0
 	// Power up the sensor
-	digitalWrite(CO2_PM_POWER, HIGH); // power off RAK12037
+	digitalWrite(CO2_PM_POWER, HIGH); // power on RAK12037
 	delay(100);
 	init_rak12037();
 #else
 	// Change number of seconds between measurements: 2 to 1800 (30 minutes), stored in non-volatile memory of SCD30
 	scd30.setMeasurementInterval(2);
 
-	// Enable self calibration
-	scd30.setAutoSelfCalibration(true);
+	// Disable self calibration
+	scd30.setAutoSelfCalibration(false);
 
 	// Start the measurements
 	scd30.beginMeasuring();

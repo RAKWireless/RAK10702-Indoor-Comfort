@@ -129,6 +129,17 @@ bool init_app(void)
 	init_rak14000();
 #endif
 
+	// Check if device is running from battery
+	float batt_val = read_batt();
+	MYLOG("APP", "Battery level is %.3f", batt_val);
+	g_is_using_battery = batt_val < 1000.0 ? false : true;
+
+#if FORCE_PWR_SRC == 1
+	g_is_using_battery = false;
+#elif FORCE_PWR_SRC == 2
+	g_is_using_battery = true;
+#endif
+
 	delay(500);
 	// Scan the I2C interfaces for devices
 	find_modules();
@@ -144,17 +155,6 @@ bool init_app(void)
 	Serial.flush();
 	// Reset the packet
 	g_solution_data.reset();
-
-	// Check if device is running from battery
-	float batt_val = read_batt();
-	MYLOG("APP", "Battery level is %.3f", batt_val);
-	g_is_using_battery = batt_val < 1000.0 ? false : true;
-
-#if FORCE_PWR_SRC == 1
-	g_is_using_battery = false;
-#elif FORCE_PWR_SRC == 2
-	g_is_using_battery = true;
-#endif
 
 	rgb_toggle.begin(15000, do_rgb_toggle, NULL, false);
 	// If on battery usage, start timer to switch off the RGB LED
@@ -230,6 +230,7 @@ void app_event_handler(void)
 
 	// Power up and initialize I2C
 	power_i2c(true);
+	switch_power_off = true;
 
 	/*********************************************************/
 	/* Status & Send event handling                          */
@@ -268,6 +269,7 @@ void app_event_handler(void)
 		// Get values from the connected modules
 		get_sensor_values();
 
+		switch_power_off = true;
 		if (g_is_using_battery)
 		{
 			switch_power_off = true;
@@ -360,13 +362,6 @@ void app_event_handler(void)
 			// Not occupied, double the update time
 			api_timer_restart(g_lorawan_settings.send_repeat_time * 2);
 		}
-
-		if (switch_power_off)
-		{
-			MYLOG("APP", ">>>> POWER OFF");
-			// Power down the modules
-			power_modules(false);
-		}
 	}
 
 	/*********************************************************/
@@ -376,12 +371,8 @@ void app_event_handler(void)
 	if ((g_task_event_type & VOC_REQ) == VOC_REQ)
 	{
 		g_task_event_type &= N_VOC_REQ;
-		if (digitalRead(EPD_POWER) == LOW)
-		{
-			MYLOG("APP", "VOC power up I2C");
-			power_i2c(true);
-			switch_power_off = true;
-		}
+
+		power_rak12047(true);
 		MYLOG("APP", "Handle VOC");
 		do_read_rak12047();
 	}
@@ -466,6 +457,9 @@ void app_event_handler(void)
 		// Shut down I2C
 		power_i2c(false);
 	}
+
+	// s = std::bitset<16>(g_task_event_type).to_string(); // string conversion
+	// MYLOG("APP", "Leave App Event  %s", s.c_str());
 }
 
 /**

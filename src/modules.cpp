@@ -138,13 +138,16 @@ void find_modules(void)
 		has_rak12037 = true;
 	}
 
-	if (!init_rak12039())
+	if (!g_is_using_battery)
 	{
-		has_rak12039 = false;
-	}
-	else
-	{
-		has_rak12039 = true;
+		if (!init_rak12039())
+		{
+			has_rak12039 = false;
+		}
+		else
+		{
+			has_rak12039 = true;
+		}
 	}
 
 	if (!init_rak12047())
@@ -294,19 +297,15 @@ void power_i2c(bool switch_on)
 	if (switch_on)
 	{
 		digitalWrite(EPD_POWER, HIGH);
-		delay(100);
-		Wire.begin();
+		delay(500);
+		// Wire.begin();
 	}
 	else
 	{
 		digitalWrite(EPD_POWER, LOW);
-		Wire.end();
-		pinMode(WB_I2C1_SDA, INPUT_PULLUP);
-		pinMode(WB_I2C1_SCL, INPUT_PULLUP);
-		// pinMode(WB_I2C1_SDA, OUTPUT_D0S1);
-		// pinMode(WB_I2C1_SCL, OUTPUT_D0S1);
-		// digitalWrite(WB_I2C1_SDA, HIGH);
-		// digitalWrite(WB_I2C1_SCL, HIGH);
+		// Wire.end();
+		// pinMode(WB_I2C1_SDA, INPUT_PULLUP);
+		// pinMode(WB_I2C1_SCL, INPUT_PULLUP);
 	}
 }
 
@@ -328,6 +327,7 @@ void power_modules(bool switch_on)
 
 	if (has_rak1901)
 	{
+		MYLOG("MOD", "Handle RAK1901");
 		if (switch_on)
 		{
 			start_up_rak1901();
@@ -336,10 +336,12 @@ void power_modules(bool switch_on)
 		{
 			shut_down_rak1901();
 		}
+		MYLOG("MOD", "Finished RAK1901");
 	}
 
 	if (has_rak1902)
 	{
+		MYLOG("MOD", "Handle RAK1902");
 		if (switch_on)
 		{
 			startup_rak1902();
@@ -348,10 +350,12 @@ void power_modules(bool switch_on)
 		{
 			shut_down_rak1902();
 		}
+		MYLOG("MOD", "Finished RAK1902");
 	}
 
 	if (has_rak1903)
 	{
+		MYLOG("MOD", "Handle RAK1903");
 		if (switch_on)
 		{
 			startup_rak1903();
@@ -360,10 +364,12 @@ void power_modules(bool switch_on)
 		{
 			shut_down_rak1903();
 		}
+		MYLOG("MOD", "Finished RAK1903");
 	}
 
 	if (has_rak12010)
 	{
+		MYLOG("MOD", "Handle RAK12010");
 		if (switch_on)
 		{
 			startup_rak12010();
@@ -372,10 +378,12 @@ void power_modules(bool switch_on)
 		{
 			shut_down_rak12010();
 		}
+		MYLOG("MOD", "Finished RAK12010");
 	}
 
 	if (has_rak12019)
 	{
+		MYLOG("MOD", "Handle RAK12019");
 		if (switch_on)
 		{
 			startup_rak12019();
@@ -384,22 +392,12 @@ void power_modules(bool switch_on)
 		{
 			shut_down_rak12019();
 		}
+		MYLOG("MOD", "Finished RAK12019");
 	}
 
 	if (has_rak12037 || has_rak12039)
 	{
-		if (has_rak12037)
-		{
-			if (switch_on)
-			{
-				startup_rak12037();
-			}
-			else
-			{
-				shut_down_rak12037();
-			}
-		}
-
+		MYLOG("MOD", "Handle RAK12039");
 		if (has_rak12039)
 		{
 			if (switch_on)
@@ -410,6 +408,20 @@ void power_modules(bool switch_on)
 			{
 				shut_down_rak12039();
 			}
+		}
+		MYLOG("MOD", "Finished RAK12039");
+		MYLOG("MOD", "Handle RAK12037");
+		if (has_rak12037)
+		{
+			if (switch_on)
+			{
+				startup_rak12037();
+			}
+			else
+			{
+				shut_down_rak12037();
+			}
+			MYLOG("MOD", "Finished RAK12037");
 		}
 	}
 

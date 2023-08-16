@@ -150,6 +150,7 @@ void read_rak12039(void);
 bool init_rak12047(void);
 void read_rak12047(void);
 void do_read_rak12047(void);
+void power_rak12047(bool switch_on);
 extern volatile bool g_voc_is_active;
 extern float last_light_lux;
 

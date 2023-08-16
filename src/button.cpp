@@ -108,6 +108,11 @@ void multiClick()
 		MYLOG("BTN", "RST request");
 		api_wake_loop(RST_REQ);
 		break;
+	case 12:
+		MYLOG("BTN", "Bootloader request");
+		NRF_POWER->GPREGRET = 0xA8;	// 0xA8 OTA, 0x4e Serial, 0x57 UF2
+		NVIC_SystemReset();			// or sd_nvic_SystemReset();
+		break;
 	default:
 		MYLOG("BTN", "multiClick(%d) detected.", button.getNumberClicks());
 		break;

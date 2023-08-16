@@ -56,7 +56,8 @@ static int at_set_ui(char *str)
  */
 int at_query_ui(void)
 {
-	AT_PRINTF("%d", g_ui_selected);
+	snprintf(g_at_query_buf, ATQUERY_SIZE, "%d", g_ui_selected);
+	// AT_PRINTF("%d", g_ui_selected);
 	return AT_SUCCESS;
 }
 
@@ -121,7 +122,17 @@ void save_ui_settings(uint8_t ui_selected)
  */
 int at_query_modules(void)
 {
-	announce_modules();
+	// announce_modules();
+	snprintf(g_at_query_buf, ATQUERY_SIZE, "%s%s%s%s%s%s%s%s%s%s",
+			 has_rak1901 ? "RAK1901 " : "",
+			 has_rak1902 ? "RAK1902 " : "",
+			 has_rak1903 ? "RAK1903 " : "",
+			 has_rak1906 ? "RAK1906 " : "",
+			 has_rak12002 ? "RAK12002 " : "",
+			 has_rak12010 ? "RAK12010 " : "",
+			 has_rak12019 ? "RAK12019 " : "",
+			 has_rak12037 ? "RAK12037 " : "",
+			 has_rak12047 ? "RAK12047 " : "");
 	return 0;
 }
 
@@ -132,7 +143,7 @@ int at_query_modules(void)
 atcmd_t g_user_at_cmd_list_modules[] = {
 	/*|    CMD    |     AT+CMD?      |    AT+CMD=?    |  AT+CMD=value |  AT+CMD  | Permissions |*/
 	// Module commands
-	{"+MOD", "List all connected I2C devices", at_query_modules, NULL, at_query_modules, "RW"},
+	{"+MOD", "List all connected I2C devices", at_query_modules, NULL, at_query_modules, "R"},
 };
 
 /*****************************************
@@ -233,7 +244,8 @@ static int at_query_rtc(void)
 {
 	// Get date/time from the RTC
 	read_rak12002();
-	AT_PRINTF("%d.%02d.%02d %d:%02d:%02d", g_date_time.year, g_date_time.month, g_date_time.date, g_date_time.hour, g_date_time.minute, g_date_time.second);
+	snprintf(g_at_query_buf, ATQUERY_SIZE, "%d.%02d.%02d %d:%02d:%02d", g_date_time.year, g_date_time.month, g_date_time.date, g_date_time.hour, g_date_time.minute, g_date_time.second);
+	// AT_PRINTF("%d.%02d.%02d %d:%02d:%02d", g_date_time.year, g_date_time.month, g_date_time.date, g_date_time.hour, g_date_time.minute, g_date_time.second);
 	return 0;
 }
 
@@ -287,10 +299,12 @@ int at_query_co2(void)
 	uint16_t current_calib_value = get_calib_rak12037();
 	if (current_calib_value == 0)
 	{
-		AT_PRINTF("ERROR reading calibration");
+		snprintf(g_at_query_buf, ATQUERY_SIZE, "ERROR reading calibration");
+		// AT_PRINTF("ERROR reading calibration");
 		return AT_ERRNO_EXEC_FAIL;
 	}
-	AT_PRINTF("%d", get_calib_rak12037());
+	snprintf(g_at_query_buf, ATQUERY_SIZE, "%d", get_calib_rak12037());
+	// AT_PRINTF("%d", get_calib_rak12037());
 	return AT_SUCCESS;
 }
 

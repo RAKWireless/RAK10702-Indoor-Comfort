@@ -41,7 +41,8 @@ bool init_rak12039(void)
 	time_t wait_sensor = millis();
 	MYLOG("PMS", "RAK12039 scan start %ld ms", millis());
 	byte error;
-	while (1)
+	bool waiting = true;
+	while (waiting)
 	{
 		delay(500);
 		Wire.beginTransmission(0x12);
@@ -49,7 +50,7 @@ bool init_rak12039(void)
 		if (error == 0)
 		{
 			MYLOG("PMS", "RAK12039 answered at %ld ms", millis());
-			break;
+			waiting = false;
 		}
 		if ((millis() - wait_sensor) > 10000)
 		{
@@ -58,11 +59,17 @@ bool init_rak12039(void)
 		}
 	}
 
+	MYLOG("PMS", "Initialize PMSA003I");
+
 	if (!PMSA003I.begin())
 	{
 		MYLOG("PMS", "PMSA003I begin fail,please check connection!");
 		digitalWrite(SET_PIN, LOW);
 		return false;
+	}
+	else
+	{
+		MYLOG("PMS", "PMSA003I begin finished");
 	}
 
 	return true;

@@ -150,6 +150,37 @@ void read_rak12047(void)
 #endif
 }
 
+void power_rak12047(bool switch_on)
+{
+	if (switch_on)
+	{
+		digitalWrite(EPD_POWER, HIGH);
+		delay(250);
+		// Wire.begin();
+		sgp40.begin(Wire);
+
+		uint16_t serialNumber[3];
+		uint8_t serialNumberSize = 3;
+
+		uint16_t error = sgp40.getSerialNumber(serialNumber, serialNumberSize);
+
+		if (error)
+		{
+			errorToString(error, errorMessage, 256);
+			MYLOG("VOC", "Error trying to execute getSerialNumber() %s", errorMessage);
+		}
+		else
+		{
+			MYLOG("VOC", "Powerup RAK12047 success");
+		}
+	}
+	else
+	{
+		digitalWrite(EPD_POWER, LOW);
+		// Wire.end();
+	}
+}
+
 /**
  * @brief Read the current VOC and feed it to the
  *        VOC algorithm
