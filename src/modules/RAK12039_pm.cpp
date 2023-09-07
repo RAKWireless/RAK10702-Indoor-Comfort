@@ -30,13 +30,6 @@ uint16_t normalize_env_val(uint16_t org_val);
  */
 bool init_rak12039(void)
 {
-	// On/Off control pin
-	pinMode(SET_PIN, OUTPUT);
-	pinMode(WB_IO5, INPUT_PULLUP);
-
-	// Sensor on
-	digitalWrite(SET_PIN, HIGH);
-
 	// Wait for sensor wake-up
 	time_t wait_sensor = millis();
 	MYLOG("PMS", "RAK12039 scan start %ld ms", millis());

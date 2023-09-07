@@ -37,10 +37,12 @@ void find_modules(void)
 {
 	// RAK12039 has extra GPIO for power control
 	// On/Off control pin
-	pinMode(WB_IO6, OUTPUT);
+	pinMode(SET_PIN, OUTPUT);
 	// Sensor on
-	digitalWrite(WB_IO6, HIGH);
-	delay(500);
+	digitalWrite(SET_PIN, HIGH);
+	delay(1000);
+	// // Reset pin
+	// pinMode(WB_IO5, INPUT_PULLUP);
 
 	Wire.begin();
 

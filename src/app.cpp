@@ -80,7 +80,8 @@ void setup_app(void)
 bool init_app(void)
 {
 	api_set_version(SW_VERSION_1, SW_VERSION_2, SW_VERSION_3);
-
+	g_device_pid = "RAK10702";
+	g_custom_fw_ver = "RAK10702 V" + String(SW_VERSION_1) + "." + String(SW_VERSION_2) + "." + String(SW_VERSION_3);
 	AT_PRINTF("===============================================");
 	AT_PRINTF("Indoor Comfort Sensor");
 	AT_PRINTF("Built with RAK's WisBlock");
