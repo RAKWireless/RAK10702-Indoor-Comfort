@@ -42,7 +42,7 @@ For the displays, the RAK14000 EPD module with a 4.2" display is used.
 | Module | Function |
 | --     | --       |
 | [RAK4630](https://docs.rakwireless.com/Product-Categories/WisDuo/RAK4630-Module/Overview/) ⤴️ | WisDuo module |
-| [RAK19024](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK19024/Overview/) ⤴️ | Custom WisBlock Base board with 3 IO slots |
+| RAK19024 | Custom WisBlock Base board with 3 IO slots, only available with the [RAK10702 Indoor Comfort Kit](https://docs.rakwireless.com/Product-Categories/WisBlock/Overview/) ⤴️ (coming soon) |
 | [RAK1901](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK1901/Overview/) ⤴️ | WisBlock Temperature and Humidty Sensor Sensirion SHTC3 |
 | [RAK1902](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK1902/Overview/) ⤴️ | WisBlock Barometer Pressure Sensor ST LPS22HB |
 | [RAK1903](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK1903/Overview/) ⤴️ | WisBlock Light Sensor TI OPT3001 |
@@ -51,7 +51,7 @@ For the displays, the RAK14000 EPD module with a 4.2" display is used.
 | [RAK12010](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK12010/Overview/) ⤴️ | WisBlock Ambient Light sensor Vishay Semiconductors VEML7700 |
 | [RAK12019](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK12019/Overview/) ⤴️ | WisBlock UV Light sensor Lite-On LTR-390UV-01|
 | [RAK12037](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK12037/Overview/) ⤴️ | WisBlock CO2 sensor Sensirion SCD30 |
-| [RAK12039](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK12039/Overview/) ⤴️ | WisBlock Particle Matter sensor Plantower PMSA003I |
+| RAK12067 | WisBlock Particle Matter sensor Plantower PMSA003I, only available with the [RAK10702 Indoor Comfort Kit](https://docs.rakwireless.com/Product-Categories/WisBlock/Overview/) ⤴️ (coming soon) |
 | [RAK12047](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK12047/Overview/) ⤴️ | WisBlock VOC sensor Sensirion SGP40 |
 | [RAK14000](https://docs.rakwireless.com/Product-Categories/WisBlock/RAK14000/Overview/) ⤴️ | WisBlock EPD with custom 4.2" display |
 

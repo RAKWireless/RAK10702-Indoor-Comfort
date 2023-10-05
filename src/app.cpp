@@ -44,9 +44,11 @@ void setup_app(void)
 	// Initialize Serial for debug output
 	Serial.begin(115200);
 
+	delay(500);
+
 	nrfx_power_usb_state_t usb_status = nrfx_power_usbstatus_get();
 
-	if (usb_status == NRFX_POWER_USB_STATE_CONNECTED) // USB power detected
+	if (usb_status != NRFX_POWER_USB_STATE_DISCONNECTED) // USB power detected
 	{
 		time_t serial_timeout = millis();
 		// On nRF52840 the USB serial is not available immediately
@@ -55,10 +57,15 @@ void setup_app(void)
 			if ((millis() - serial_timeout) < 5000)
 			{
 				delay(100);
-				// digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+#if _CUSTOM_BOARD_ == 0
+				digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+				#endif
 			}
 			else
 			{
+#if _CUSTOM_BOARD_ == 0
+				digitalWrite(LED_BUILTIN, LOW);
+#endif
 				break;
 			}
 		}
@@ -67,6 +74,9 @@ void setup_app(void)
 	{
 		MYLOG("APP", "No USB connection detected");
 	}
+#if _CUSTOM_BOARD_ == 0
+	digitalWrite(LED_BUILTIN, LOW);
+#endif
 
 	g_enable_ble = true;
 }
