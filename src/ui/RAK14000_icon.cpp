@@ -8,7 +8,7 @@
  * @copyright Copyright (c) 2023
  *
  */
-#include "app.h"
+#include "main.h"
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_EPD.h>
@@ -76,7 +76,7 @@ void icon_rak14000(void)
 
 	if (has_rak1903 || has_rak12010)
 	{
-		snprintf(disp_text, 29, "Light: %.2f Lux", last_light_lux);
+		snprintf(disp_text, 29, "Light: %.2f Lux", g_last_light_lux);
 		text_rak14000(x_text, y_text, disp_text, txt_color, 1);
 		y_text += 33;
 	}
@@ -85,7 +85,7 @@ void icon_rak14000(void)
 	if (has_rak12047)
 	{
 		// Get VOC status
-		if (voc_valid)
+		if (g_voc_valid)
 		{
 			if (voc_values[voc_idx - 1] > 400)
 			{
@@ -203,17 +203,17 @@ void icon_rak14000(void)
 	if (g_air_status == 0)
 	{
 		display.drawBitmap((x_text - good_air_width) / 2, (display_height - 20 - good_air_height) / 2, good_air, good_air_width, good_air_height, txt_color);
-		set_rgb_color(RGB_BLUE);
+		// set_rgb_color(RGB_BLUE);
 	}
 	else if (g_air_status < 255)
 	{
 		display.drawBitmap((x_text - bad_air_width) / 2, (display_height - 20 - bad_air_height) / 2, worried_air, worried_air_width, worried_air_height, txt_color);
-		set_rgb_color(RGB_YELLOW);
+		// set_rgb_color(RGB_YELLOW);
 	}
 	else
 	{
 		display.drawBitmap((x_text - worried_air_width) / 2, (display_height - 20 - worried_air_height) / 2, bad_air, bad_air_width, bad_air_height, txt_color);
-		set_rgb_color(RGB_RED);
+		// set_rgb_color(RGB_RED);
 	}
 }
 

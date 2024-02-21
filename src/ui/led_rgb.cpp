@@ -2,36 +2,51 @@
  * @file led_rgb.cpp
  * @author Bernd Giesecke (bernd@giesecke.tk)
  * @brief RGB LED driver
- * @version 0.1
- * @date 2023-03-22
+ * @version 0.2
+ * @date 2024-02-21
  *
- * @copyright Copyright (c) 2023
+ * @copyright Copyright (c) 2024
  *
  */
-#include "app.h"
+#include "main.h"
 #include <NCP5623.h>
-#include "modules/RAK14000_epd.h"
+#include "RAK14000_epd.h"
 
 /** RGB LED instance */
 NCP5623 rgb;
 
 /** Flag if RGB LED driver was found */
 bool g_has_rgb = false;
+
+/** Timer for RGB control */
+SoftwareTimer g_rgb_timer;
+
+/** Flag if RGB is on or off */
+bool g_rgb_on = false;
+
 /**
- * @brief Initialize the RGB driver 
- * 
+ * @brief Initialize the RGB driver
+ *
  */
-void init_rgb(void)
+bool init_rgb(void)
 {
 	g_has_rgb = rgb.begin();
 	if (!g_has_rgb)
 	{
 		MYLOG("RGB", "RGB not found");
-		return;
+		return false;
 	}
 	rgb.setCurrent(1);
 	rgb.setColor(255, 255, 0); // Yellow
-	AT_PRINTF("+EVT:RGB OK")
+
+	return true;
+}
+
+void timer_rgb(void)
+{
+	g_rgb_on = true;
+	g_rgb_timer.begin(200, rgb_timer_cb, NULL, false);
+
 }
 
 /**
@@ -47,21 +62,25 @@ void set_rgb_color(uint8_t red, uint8_t green, uint8_t blue)
 	{
 		return;
 	}
-	
-	if (g_is_using_battery)
-	{
-		MYLOG("RGB", "I2C might be off, switching power on");
-		digitalWrite(EPD_POWER, HIGH);
-	}
 
 	// If room is empty, switch off the LED's
 	if (!g_occupied)
 	{
 		rgb.setColor(0, 0, 0);
+		rgb.setCurrent(1);
 		return;
 	}
+
 	rgb.setCurrent(1);
+
 	rgb.setColor(red, green, blue);
+}
+
+void shutdown_rgb(void)
+{
+	rgb.setCurrent(0);
+	rgb.shutDown();
+	rgb.writeReg(0,0);
 }
 
 void set_rgb_air_status(void)
@@ -73,7 +92,7 @@ void set_rgb_air_status(void)
 	if (has_rak12047)
 	{
 		// Get VOC status
-		if (voc_valid)
+		if (g_voc_valid)
 		{
 			if (voc_values[voc_idx - 1] > 400)
 			{

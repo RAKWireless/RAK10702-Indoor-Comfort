@@ -2,19 +2,26 @@
  * @file RAK1903_light.cpp
  * @author Bernd Giesecke (bernd.giesecke@rakwireless.com)
  * @brief Initialize and read data from OPT3001 sensor
- * @version 0.2
- * @date 2022-01-30
+ * @version 0.3
+ * @date 2024-02-21
  *
- * @copyright Copyright (c) 2022
+ * @copyright Copyright (c) 2024
  *
  */
-#include "app.h"
+#include "main.h"
 #include <ClosedCube_OPT3001.h>
 
 /** Sensor instance */
 ClosedCube_OPT3001 opt3001;
+
 /** Sensor I2C address */
 #define OPT3001_ADDRESS 0x44
+
+/** Light value */
+float g_last_light_lux = 0.0;
+
+/** Configuration register */
+OPT3001_Config newConfig;
 
 /**
  * @brief Initialize the Light sensor
@@ -30,8 +37,6 @@ bool init_rak1903(void)
 		return false;
 	}
 
-	OPT3001_Config newConfig;
-
 	newConfig.RangeNumber = 0b1100; // B1100;
 	newConfig.ConvertionTime = 0b0; // B0;
 	newConfig.Latch = 0b1; // B1;
@@ -43,6 +48,9 @@ bool init_rak1903(void)
 		MYLOG("LIGHT", "Could not configure OPT3001");
 		return false;
 	}
+
+	shutdown_rak1903();
+
 	return true;
 }
 
@@ -58,11 +66,11 @@ void read_rak1903()
 	OPT3001 result = opt3001.readResult();
 	if (result.error == NO_ERROR)
 	{
-		last_light_lux = result.lux;
+		g_last_light_lux = result.lux;
 
-		MYLOG("LIGHT", "L: %.2f", last_light_lux);
+		MYLOG("LIGHT", "L: %.2f", g_last_light_lux);
 
-		g_solution_data.addLuminosity(LPP_CHANNEL_LIGHT, (uint32_t)(last_light_lux));
+		g_solution_data.addLuminosity(LPP_CHANNEL_LIGHT, (uint32_t)(g_last_light_lux));
 	}
 	else
 	{
@@ -77,14 +85,32 @@ void read_rak1903()
  */
 void startup_rak1903(void)
 {
-	// No low power functionality found
+	newConfig.RangeNumber = 0b1100;				// B1100;
+	newConfig.ConvertionTime = 0b0;				// B0;
+	newConfig.Latch = 0b1;						// B1;
+	newConfig.ModeOfConversionOperation = 0b11; // B11;
+
+	OPT3001_ErrorCode errorConfig = opt3001.writeConfig(newConfig);
+	if (errorConfig != NO_ERROR)
+	{
+		MYLOG("LIGHT", "Could not configure OPT3001");
+	}
 }
 
 /**
  * @brief Put the RAK1903 into sleep mode
  *
  */
-void shut_down_rak1903(void)
+void shutdown_rak1903(void)
 {
-	// No low power functionality found
+	newConfig.RangeNumber = 0b1100;				// B1100;
+	newConfig.ConvertionTime = 0b0;				// B0;
+	newConfig.Latch = 0b1;						// B1;
+	newConfig.ModeOfConversionOperation = 0b00; // B00;
+
+	OPT3001_ErrorCode errorConfig = opt3001.writeConfig(newConfig);
+	if (errorConfig != NO_ERROR)
+	{
+		MYLOG("LIGHT", "Could not configure OPT3001");
+	}
 }

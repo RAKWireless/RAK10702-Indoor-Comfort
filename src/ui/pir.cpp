@@ -2,13 +2,13 @@
  * @file pir.cpp
  * @author Bernd Giesecke (bernd@giesecke.tk)
  * @brief PIR sensor init and handler
- * @version 0.1
- * @date 2023-03-23
+ * @version 0.2
+ * @date 2024-02-21
  *
- * @copyright Copyright (c) 2023
+ * @copyright Copyright (c) 2024
  *
  */
-#include "app.h"
+#include "main.h"
 
 /** Flag if occupancy was detected */
 bool g_occupied = true;
@@ -18,7 +18,7 @@ SoftwareTimer occupation_timer;
 
 /**
  * @brief Interrupt callback for PIR sensor
- * 
+ *
  */
 void pir_int(void)
 {
@@ -29,7 +29,7 @@ void pir_int(void)
 	if (!g_occupied)
 	{
 		// If room was empty, initiate a refresh
-		api_wake_loop(MOTION_TRIGGER);
+		api_wake_loop(MOTION);
 	}
 	g_occupied = true;
 }
@@ -37,8 +37,8 @@ void pir_int(void)
 /**
  * @brief Timer callback if room is unoccupied for a long time
  * 		Time is set with the timer start, default is 10 minutes
- * 
- * @param unused 
+ *
+ * @param unused
  */
 void occupation_timeout(TimerHandle_t unused)
 {
@@ -49,7 +49,7 @@ void occupation_timeout(TimerHandle_t unused)
 
 /**
  * @brief Initialize the PIR sensor
- * 
+ *
  */
 void init_pir(void)
 {
@@ -64,6 +64,5 @@ void init_pir(void)
 
 	// Start timer for occupation detection (10 minutes)
 	occupation_timer.begin(10 * 60 * 1000, occupation_timeout, NULL, false);
-	// occupation_timer.begin(30 * 1000, occupation_timeout, NULL, false);
 	occupation_timer.start();
 }

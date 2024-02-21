@@ -2,13 +2,13 @@
  * @file RAK1902_press.cpp
  * @author Bernd Giesecke (bernd.giesecke@rakwireless.com)
  * @brief Initialize and read values from the LPS22HB sensor
- * @version 0.2
- * @date 2022-01-30
+ * @version 0.3
+ * @date 2024-02-21
  *
  * @copyright Copyright (c) 2022
  *
  */
-#include "app.h"
+#include "main.h"
 #include <LPS35HW.h>
 
 /** Sensor instance */
@@ -31,6 +31,8 @@ bool init_rak1902(void)
 	lps.setLowPower(true);
 	lps.setOutputRate(LPS35HW::OutputRate_75Hz);	   // 75 Hz sample rate
 	lps.setLowPassFilter(LPS35HW::LowPassFilter_ODR9); // default is off
+
+	shutdown_rak1902();
 	return true;
 }
 
@@ -54,6 +56,7 @@ void read_rak1902(void)
 
 	MYLOG("PRESS", "P: %.2f", pressure);
 
+	g_last_pressure = pressure;
 	g_solution_data.addBarometricPressure(LPP_CHANNEL_PRESS, pressure);
 
 #if HAS_EPD > 0
@@ -87,8 +90,10 @@ void startup_rak1902(void)
  * @brief Put the RAK1902 into sleep mode
  *
  */
-void shut_down_rak1902(void)
+void shutdown_rak1902(void)
 {
+	lps.setOutputRate(LPS35HW::OutputRate_OneShot); // Oneshot
+	delay(250);
 	lps.setLowPower(true);
-	lps.setOutputRate(LPS35HW::OutputRate_OneShot); // 75 Hz sample rate
+	delay(250);
 }

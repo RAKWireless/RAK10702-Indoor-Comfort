@@ -66,6 +66,8 @@ extern char *months_txt[];
 // Forward declaration
 void text_rak14000(int16_t x, int16_t y, char *text, uint16_t text_color, uint32_t text_size);
 void scientific_rak14000(void);
+void rak14000_start_screen(bool startup);
+void status_ui_rak14000(void);
 void voc_rak14000(void);
 void co2_rak14000(bool has_pm);
 void pm_rak14000(void);
@@ -74,6 +76,13 @@ void humid_rak14000(bool has_pm, bool has_baro);
 void baro_rak14000(bool has_pm);
 void icon_rak14000(void);
 void draw_bar_rak14000(uint8_t level, uint16_t x, uint16_t y);
+void light_rak14000(bool has_pm);
+void set_voc_rak14000(uint16_t voc_value);
+void set_temp_rak14000(float temp_value);
+void set_humid_rak14000(float humid_value);
+void set_co2_rak14000(float co2_value);
+void set_baro_rak14000(float baro_value);
+void set_pm_rak14000(uint16_t pm10_env, uint16_t pm25_env, uint16_t pm100_env);
 
 extern unsigned char good_air[];
 extern uint16_t good_air_width;
@@ -162,7 +171,7 @@ extern GFXfont RAK_EPD_20pt;
 #define EPD_CS SS
 #define EPD_DC WB_IO1
 #define SRAM_CS -1	 // not use
-#define EPD_RESET -1 // not use
+#define EPD_RESET - 1 // not use
 #define EPD_BUSY WB_IO4
 
 #define RGB_BLUE 0,0,255

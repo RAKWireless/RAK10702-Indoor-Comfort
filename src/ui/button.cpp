@@ -3,12 +3,12 @@
  * @author Bernd Giesecke (bernd@giesecke.tk)
  * @brief Button initializer and handler
  * @version 0.1
- * @date 2023-03-23
+ * @date 2024-02-21
  *
- * @copyright Copyright (c) 2023
+ * @copyright Copyright (c) 2024
  *
  */
-#include "app.h"
+#include "main.h"
 #include "OneButton.h"
 
 /** Timer for VOC measurement */
@@ -98,7 +98,7 @@ void multiClick()
 			restart_advertising(15);
 		}
 		break;
-	// Show Device Status Screen
+		// Show Device Status Screen
 	case 4:
 		g_ui_selected = 2;
 		api_wake_loop(DISP_UPDATE);
@@ -108,9 +108,10 @@ void multiClick()
 		MYLOG("BTN", "RST request");
 		api_wake_loop(RST_REQ);
 		break;
+		// Jump to Bootloader mode
 	case 12:
 		MYLOG("BTN", "Bootloader request");
-		NRF_POWER->GPREGRET = 0xA8;	// 0xA8 OTA, 0x4e Serial, 0x57 UF2
+		NRF_POWER->GPREGRET = 0xA8; // 0xA8 OTA, 0x4e Serial, 0x57 UF2
 		NVIC_SystemReset();			// or sd_nvic_SystemReset();
 		break;
 	default:

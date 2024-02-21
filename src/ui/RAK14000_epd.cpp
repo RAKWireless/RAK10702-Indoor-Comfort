@@ -2,13 +2,13 @@
  * @file RAK14000_epd_4_2.cpp
  * @author Bernd Giesecke (bernd@giesecke.tk)
  * @brief Initialization and functions for EPD display
- * @version 0.1
- * @date 2022-06-25
+ * @version 0.2
+ * @date 2024-02-21
  *
- * @copyright Copyright (c) 2022
+ * @copyright Copyright (c) 2024
  *
  */
-#include "app.h"
+#include "main.h"
 
 #include "RAK14000_epd.h"
 
@@ -47,17 +47,6 @@ uint16_t txt_color = EPD_BLACK;
 uint8_t g_air_status = 0;
 bool g_status_changed = true;
 
-volatile bool g_epd_off = false;
-
-/** EPD task handle */
-TaskHandle_t epd_task_handle;
-
-/** Semaphore for EPD display update */
-SemaphoreHandle_t g_epd_sem;
-
-/** Required for Semaphore from ISR */
-static BaseType_t xHigherPriorityTaskWoken = pdTRUE;
-
 // For text length calculations
 int16_t txt_x1;
 int16_t txt_y1;
@@ -82,8 +71,10 @@ uint16_t spacer;
 uint8_t g_ui_selected = 0;
 /** Save last selected UI, in case Status screen is forced */
 uint8_t g_ui_last = 0;
-
+/** Flag for RAK14000 available */
 bool has_rak14000 = false;
+/** Timer for shutdown display */
+SoftwareTimer g_epd_off_timer;
 
 /**
  * @brief Initialization of RAK14000 EPD
@@ -91,20 +82,6 @@ bool has_rak14000 = false;
  */
 void init_rak14000(void)
 {
-	g_epd_off = false;
-
-	// /// \todo This does not work on the RAK19024
-	// pinMode(WB_IO3, INPUT_PULLDOWN);
-	// pinMode(WB_IO5, INPUT_PULLDOWN);
-	// pinMode(WB_IO6, INPUT_PULLDOWN);
-
-	// if ((digitalRead(WB_IO3) == LOW) && (digitalRead(WB_IO5) == LOW) && (digitalRead(WB_IO6) == LOW))
-	// {
-	// 	MYLOG("EPD", "All button pins are low, expecting no EPD module");
-	// 	has_rak14000 = false;
-	// 	return;
-	// }
-
 	has_rak14000 = true;
 
 	display.begin();
@@ -114,20 +91,73 @@ void init_rak14000(void)
 
 	read_ui_settings();
 
-	rak14000_start_screen();
+	rak14000_start_screen(true);
+
+	g_epd_off_timer.begin(2000, shutdown_rak14000, NULL, false);
 }
 
 /**
- * @brief Wake task to handle screen updates
+ * @brief Set LoRa connection status
  *
  */
-void wake_rak14000(void)
+void status_lora_rak14000(void)
 {
-	if (!has_rak14000)
+	if (g_lorawan_settings.lorawan_enable)
 	{
-		return;
+		if (!g_lpwan_has_joined)
+		{
+			if (g_ui_selected == 1)
+			{
+				display.drawCircle(6, 6, 3, txt_color);
+				display.drawCircle(14, 14, 3, txt_color);
+				display.drawCircle(6, 6, 4, txt_color);
+				display.drawCircle(14, 14, 4, txt_color);
+			}
+			else if (g_ui_selected == 0)
+			{
+				display.drawCircle(380, 6, 3, txt_color);
+				display.drawCircle(388, 14, 3, txt_color);
+				display.drawCircle(380, 6, 4, txt_color);
+				display.drawCircle(388, 14, 4, txt_color);
+			}
+		}
+		else
+		{
+			if (g_ui_selected == 1)
+			{
+				display.drawCircle(6, 6, 3, txt_color);
+				display.drawCircle(10, 10, 3, txt_color);
+				display.drawCircle(6, 6, 4, txt_color);
+				display.drawCircle(10, 10, 4, txt_color);
+			}
+			else if (g_ui_selected == 0)
+			{
+				display.drawCircle(380, 6, 3, txt_color);
+				display.drawCircle(384, 10, 3, txt_color);
+				display.drawCircle(380, 6, 4, txt_color);
+				display.drawCircle(384, 10, 4, txt_color);
+			}
+		}
 	}
-	xSemaphoreGiveFromISR(g_epd_sem, &xHigherPriorityTaskWoken);
+	else
+	{
+		if (g_ui_selected == 1)
+		{
+			display.drawCircle(6, 6, 5, txt_color);
+			display.drawCircle(15, 6, 5, txt_color);
+			display.drawCircle(6, 6, 4, txt_color);
+			display.drawCircle(15, 6, 4, txt_color);
+			display.drawLine(6, 6, 15, 6, txt_color);
+		}
+		else if (g_ui_selected == 0)
+		{
+			display.drawCircle(380, 6, 5, txt_color);
+			display.drawCircle(389, 6, 5, txt_color);
+			display.drawCircle(380, 6, 4, txt_color);
+			display.drawCircle(389, 6, 4, txt_color);
+			display.drawLine(380, 6, 389, 6, txt_color);
+		}
+	}
 }
 
 /**
@@ -212,6 +242,7 @@ void refresh_rak14000(void)
 {
 	if (!has_rak14000)
 	{
+		MYLOG("EPD", "No EPD to refresh");
 		// No display detected, set RGB color
 		set_rgb_air_status();
 		return;
@@ -219,6 +250,8 @@ void refresh_rak14000(void)
 
 	// Clear display buffer
 	clear_rak14000();
+
+	status_lora_rak14000();
 
 	switch (g_ui_selected)
 	{
@@ -236,6 +269,7 @@ void refresh_rak14000(void)
 	if (has_rak14000)
 	{
 		delay(100);
+
 		display.display();
 		delay(100);
 	}
@@ -428,10 +462,6 @@ void rak14000_start_screen(bool startup)
 		}
 		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
 		text_rak14000((display_width / 2) - (txt_w / 2), 290, disp_text, (uint16_t)txt_color, 1);
-
-		// snprintf(disp_text, 59, "%d/%d/%d %d:%02d", g_date_time.date, g_date_time.month, g_date_time.year,
-		// 		 g_date_time.hour, g_date_time.minute);
-		// text_rak14000(0, 0, disp_text, (uint16_t)txt_color, 1);
 	}
 
 	display.setFont(LARGE_FONT);
@@ -450,14 +480,37 @@ void rak14000_start_screen(bool startup)
 	display.setTextSize(1);
 	if (startup)
 	{
-		display.getTextBounds((char *)"Wait for connect", 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
-		text_rak14000(display_width / 2 - (txt_w / 2), 260, (char *)"Wait for connect", (uint16_t)txt_color, 1);
+		if (g_lorawan_settings.lorawan_enable)
+		{
+			if (!g_lpwan_has_joined)
+			{
+				display.getTextBounds((char *)"Wait for connection to LoRaWAN server", 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
+				text_rak14000(display_width / 2 - (txt_w / 2), 260, (char *)"Wait for connection to LoRaWAN server", (uint16_t)txt_color, 1);
+			}
+			else
+			{
+				// snprintf(disp_text, 59, "Wait %lds for first sensor data readings", (uint32_t)(g_lorawan_settings.send_repeat_time - millis() + g_app_start_time) / 1000);
+				snprintf(disp_text, 59, "Wait 30s for first sensor data readings");
+				display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
+				text_rak14000(display_width / 2 - (txt_w / 2), 260, disp_text, (uint16_t)txt_color, 1);
+			}
+		}
+		else
+		{
+			// snprintf(disp_text, 59, "Wait %lds for first sensor data readings", (uint32_t)(g_lorawan_settings.send_repeat_time - millis() + g_app_start_time) / 1000);
+			snprintf(disp_text, 59, "Wait 30s for first sensor data readings");
+			display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
+			text_rak14000(display_width / 2 - (txt_w / 2), 260, disp_text, (uint16_t)txt_color, 1);
+		}
 	}
 	else
 	{
 		display.getTextBounds((char *)"Thank you!", 0, 0, &txt_x1, &txt_y1, &txt_w, &txt_h);
 		text_rak14000(display_width / 2 - (txt_w / 2), 260, (char *)"Thank you!", (uint16_t)txt_color, 1);
 	}
+
+	status_lora_rak14000();
+
 	display.display(false);
 }
 
@@ -467,4 +520,22 @@ void rak14000_switch_bg(void)
 	txt_color = bg_color;
 	bg_color = old_txt;
 	api_wake_loop(DISP_UPDATE);
+}
+
+/**
+ * @brief Wake up RAK14000 from sleep
+ *
+ */
+void startup_rak14000(void)
+{
+	// Keeping RAK14000 always on
+}
+
+/**
+ * @brief Put the RAK14000 into sleep mode
+ *
+ */
+void shutdown_rak14000(TimerHandle_t unused)
+{
+	// Keeping RAK14000 always on
 }

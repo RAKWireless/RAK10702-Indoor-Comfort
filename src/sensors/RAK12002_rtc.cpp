@@ -2,18 +2,19 @@
  * @file RAK12002_rtc.cpp
  * @author Bernd Giesecke (bernd.giesecke@rakwireless.com)
  * @brief Initialization and usage of RAK12002 RTC module
- * @version 0.1
- * @date 2022-02-18
+ * @version 0.2
+ * @date 2024-02-21
  *
- * @copyright Copyright (c) 2022
+ * @copyright Copyright (c) 2024
  *
  */
-#include "app.h"
+#include "main.h"
 #include <Melopero_RV3028.h>
 
 /** Instance of the RTC class */
 Melopero_RV3028 rtc;
 
+/** Structure for date and time from RTC */
 date_time_s g_date_time;
 
 /**
@@ -63,7 +64,6 @@ bool init_rak12002(void)
  */
 void set_rak12002(uint16_t year, uint8_t month, uint8_t date, uint8_t hour, uint8_t minute)
 {
-	digitalWrite(EPD_POWER, HIGH);
 	Wire.begin();
 	uint8_t weekday = (date + (uint16_t)((2.6 * month) - 0.2) - (2 * (year / 100)) + year + (uint16_t)(year / 4) + (uint16_t)(year / 400)) % 7;
 	MYLOG("RTC", "Calculated weekday is %d", weekday);

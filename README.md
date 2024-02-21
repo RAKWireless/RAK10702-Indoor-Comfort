@@ -12,6 +12,9 @@ This firmware is using the [WisBlock API V2](https://github.com/beegee-tokyo/Wis
 ### _REMARK 2_
 For the displays, the RAK14000 EPD module with a 4.2" display is used.    
 
+### _REMARK 2_
+RAK12039 is only supported by the hardware version with permanent 5-24V power supply. The battery version does not include the RAK12039 due to its high power consumption.    
+
 ----
 
 # Content
@@ -73,7 +76,6 @@ For the displays, the RAK14000 EPD module with a 4.2" display is used.
 - [Adafruit Unified Sensor](https://registry.platformio.org/libraries/adafruit/Adafruit%20Unified%20Sensor) ⤴️
 - [ClosedCube OPT3001](https://github.com/beegee-tokyo/ClosedCube_OPT3001_Arduino) ⤴️
 - [Melopero RV3028](https://registry.platformio.org/libraries/melopero/Melopero%20RV3028) ⤴️
-- [nRF52_OLED](https://registry.platformio.org/libraries/beegee-tokyo/nRF52_OLED) ⤴️
 - [RAK12019_LTR390_UV_Light](https://registry.platformio.org/libraries/beegee-tokyo/RAK12019_LTR390_UV_Light) ⤴️
 - [RAKwireless VEML Light Sensor](https://registry.platformio.org/libraries/rakwireless/RAKwireless%20VEML%20Light%20Sensor) ⤴️
 - [Sensirion Core](https://registry.platformio.org/libraries/sensirion/Sensirion%20Core) ⤴️

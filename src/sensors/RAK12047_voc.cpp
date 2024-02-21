@@ -5,12 +5,12 @@
  *        The VOC algorithm requires a reading every sampling_interval second.
  *        This code uses a timer to set the VOC_REQ every sampling_interval second
  *        and wake up the loop to perform the readings
- * @date 2022-02-05
+ * @date 2024-02-21
  *
- * @copyright Copyright (c) 2022
+ * @copyright Copyright (c) 2024
  *
  */
-#include "app.h"
+#include "main.h"
 #include <SensirionI2CSgp40.h>
 #include <VOCGasIndexAlgorithm.h>
 
@@ -28,7 +28,7 @@ SoftwareTimer voc_read_timer;
 volatile int32_t voc_index = 0;
 
 /** Flag if the VOC index is valid */
-bool voc_valid = false;
+bool g_voc_valid = false;
 
 /** Buffer for debug output */
 char errorMessage[256];
@@ -37,21 +37,7 @@ char errorMessage[256];
 uint16_t discard_counter = 0;
 
 /** Number of measurements to discard */
-uint16_t discard_number = 30;
-
-/** Flag if VOC is active, used from display driver to avoid shut down of power */
-volatile bool g_voc_is_active = false;
-
-/**
- * @brief Timer callback to wakeup the loop with the VOC_REQ event
- *
- * @param unused
- */
-void voc_read_wakeup(TimerHandle_t unused)
-{
-	MYLOG("VOC", "VOC triggered");
-	api_wake_loop(VOC_REQ);
-}
+uint16_t discard_number = 60;
 
 /**
  * @brief Initialize the sensor
@@ -72,12 +58,13 @@ bool init_rak12047(void)
 	{
 		errorToString(error, errorMessage, 256);
 		MYLOG("VOC", "Error trying to execute getSerialNumber() %s", errorMessage);
+		// shutdown_rak12047();
 		return false;
 	}
 	else
 	{
 #if MY_DEBUG > 0
-		Serial.print("SerialNumber:");
+		Serial.print("[VOC] SerialNumber:");
 		Serial.print("0x");
 		for (size_t i = 0; i < serialNumberSize; i++)
 		{
@@ -97,12 +84,14 @@ bool init_rak12047(void)
 	{
 		errorToString(error, errorMessage, 256);
 		MYLOG("VOC", "Error trying to execute executeSelfTest() %s", errorMessage);
-		return false;
+		// shutdown_rak12047();
+		// return false;
 	}
 	else if (testResult != 0xD400)
 	{
 		MYLOG("VOC", "executeSelfTest failed with error %d", testResult);
-		return false;
+		// shutdown_rak12047();
+		// return false;
 	}
 
 	int32_t index_offset;
@@ -121,6 +110,7 @@ bool init_rak12047(void)
 	// Set VOC reading interval to sampling_interval seconds
 	voc_read_timer.begin(sampling_interval * 1000, voc_read_wakeup, NULL, true);
 	voc_read_timer.start();
+
 	return true;
 }
 
@@ -133,7 +123,7 @@ bool init_rak12047(void)
 void read_rak12047(void)
 {
 	MYLOG("VOC", "Get VOC");
-	if (voc_valid)
+	if (g_voc_valid)
 	{
 		AT_PRINTF("+EVT:GET_VOC\n");
 		MYLOG("VOC", "VOC Index: %ld", voc_index);
@@ -150,45 +140,17 @@ void read_rak12047(void)
 #endif
 }
 
-void power_rak12047(bool switch_on)
-{
-	if (switch_on)
-	{
-		digitalWrite(EPD_POWER, HIGH);
-		delay(250);
-		// Wire.begin();
-		sgp40.begin(Wire);
-
-		uint16_t serialNumber[3];
-		uint8_t serialNumberSize = 3;
-
-		uint16_t error = sgp40.getSerialNumber(serialNumber, serialNumberSize);
-
-		if (error)
-		{
-			errorToString(error, errorMessage, 256);
-			MYLOG("VOC", "Error trying to execute getSerialNumber() %s", errorMessage);
-		}
-		else
-		{
-			MYLOG("VOC", "Powerup RAK12047 success");
-		}
-	}
-	else
-	{
-		digitalWrite(EPD_POWER, LOW);
-		// Wire.end();
-	}
-}
-
 /**
  * @brief Read the current VOC and feed it to the
  *        VOC algorithm
- *        Called every 10 second
+ *        Called every sampling_interval second
  *
  */
-void do_read_rak12047(void)
+void run_rak12047_algo(void)
 {
+	startup_rak12047();
+	delay(250);
+
 	uint16_t error;
 	uint16_t srawVoc = 0;
 	uint16_t defaultRh = 0x8000;
@@ -217,6 +179,17 @@ void do_read_rak12047(void)
 			defaultT = (uint16_t)((t_h_values[0] + 45) * 65535 / 175);
 		}
 	}
+	else if (has_rak12037)
+	{
+		get_rak12037_values(t_h_values);
+		MYLOG("VOC", "RAK12037 Rh: %.2f T: %.2f", t_h_values[1], t_h_values[0]);
+
+		if ((t_h_values[0] != 0.0) && (t_h_values[1] != 0.0))
+		{
+			defaultRh = (uint16_t)(t_h_values[1] * 65535 / 100);
+			defaultT = (uint16_t)((t_h_values[0] + 45) * 65535 / 175);
+		}
+	}
 
 	MYLOG("VOC", "Start reading VOC");
 	// 2.a Start heater
@@ -225,7 +198,7 @@ void do_read_rak12047(void)
 	MYLOG("VOC", "srawVoc: %d", srawVoc);
 
 	// Wait for heater up
-	delay(140);
+	delay(200);
 
 	// 2.b Measure SGP4x signals
 	error = sgp40.measureRawSignal(defaultRh, defaultT,
@@ -233,8 +206,15 @@ void do_read_rak12047(void)
 	MYLOG("VOC", "srawVoc: %d", srawVoc);
 
 	// 2.c Stop heater
-	sgp40.turnHeaterOff();
-
+	for (int retry = 0; retry < 5; retry++)
+	{
+		uint16_t success = sgp40.turnHeaterOff();
+		if (success == 0)
+		{
+			break;
+		}
+		delay(100);
+	}
 	// 3. Process raw signals by Gas Index Algorithm to get the VOC index values
 	if (error)
 	{
@@ -256,7 +236,7 @@ void do_read_rak12047(void)
 			voc_index = voc_algorithm.process(srawVoc);
 			discard_counter++;
 			MYLOG("VOC", "First good reading: %ld", voc_index);
-			voc_valid = true;
+			g_voc_valid = true;
 		}
 		else
 		{
@@ -265,4 +245,35 @@ void do_read_rak12047(void)
 			MYLOG("VOC", "VOC: %ld", voc_index);
 		}
 	}
+
+	shutdown_rak12047();
+}
+
+/**
+ * @brief Wake up RAK12047 from sleep
+ *
+ */
+void startup_rak12047(void)
+{
+	// Keeping RAK12047 always on
+}
+
+/**
+ * @brief Put the RAK12047 into sleep mode
+ *
+ */
+void shutdown_rak12047(void)
+{
+	// Make sure heater is off
+	for (int retry = 0; retry < 5; retry++)
+	{
+		uint16_t success = sgp40.turnHeaterOff();
+		if (success == 0)
+		{
+			MYLOG("VOC", "RAK12047 Heater off %d", retry);
+			break;
+		}
+		delay(100);
+	}
+	// Keeping RAK12047 always on
 }

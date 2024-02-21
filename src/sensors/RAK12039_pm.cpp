@@ -2,14 +2,14 @@
  * @file RAK12039_pm.cpp
  * @author Bernd Giesecke (bernd.giesecke@rakwireless.com)
  * @brief PMSA003I particle matter sensor support
- * @version 0.1
- * @date 2022-07-28
+ * @version 0.2
+ * @date 2024-02-21
  *
- * @copyright Copyright (c) 2022
+ * @copyright Copyright (c) 2024
  *
  */
 
-#include "app.h"
+#include "main.h"
 #include <RAK12039_PMSA003I.h>
 
 /** Instance of sensor class */
@@ -65,6 +65,8 @@ bool init_rak12039(void)
 		MYLOG("PMS", "PMSA003I begin finished");
 	}
 
+	shutdown_rak12039();
+
 	return true;
 }
 
@@ -105,55 +107,28 @@ void read_rak12039(void)
  */
 void startup_rak12039(void)
 {
-#if SENSOR_POWER_OFF > 0
-	// Sensor on
-	digitalWrite(CO2_PM_POWER, HIGH); // power on RAK12039
-#endif
-
-	pinMode(SET_PIN, OUTPUT);
 	digitalWrite(SET_PIN, HIGH);
+	delay(1000);
 
-#if SENSOR_POWER_OFF > 0
-	// Init Sensor
-	init_rak12039();
-#else
-	// Wait for wakeup
-	time_t wait_sensor = millis();
-	MYLOG("PMS", "RAK12039 wake-up scan start %ld ms", millis());
-	byte error;
-	while (1)
+	if (g_is_using_battery)
 	{
-		delay(500);
-		Wire.beginTransmission(0x12);
-		error = Wire.endTransmission();
-		if (error == 0)
+		// Init Sensor
+		if (!init_rak12039())
 		{
-			MYLOG("PMS", "RAK12039 answered at %ld ms", millis());
-			break;
-		}
-		if ((millis() - wait_sensor) > 10000)
-		{
-			MYLOG("PMS", "RAK12039 timeout after 10000 ms");
-			break;
+			MYLOG("PM", "Failed to restart PM sensor");
+			has_rak12039 = false;
+			return;
 		}
 	}
-#endif
 }
 
 /**
  * @brief Put the RAK12037 into sleep mode
  *
  */
-void shut_down_rak12039(void)
+void shutdown_rak12039(void)
 {
-#if SENSOR_POWER_OFF > 0
-	// Disable power
-	digitalWrite(CO2_PM_POWER, LOW); // power off RAK12039
-	pinMode(SET_PIN, INPUT_PULLUP);
-#else
-	digitalWrite(SET_PIN, LOW); // Sensor off
-	MYLOG("PMS", "RAK12039 fan off");
-#endif
+	digitalWrite(SET_PIN, LOW);
 }
 
 /**

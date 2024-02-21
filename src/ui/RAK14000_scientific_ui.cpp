@@ -8,7 +8,7 @@
  * @copyright Copyright (c) 2023
  *
  */
-#include "app.h"
+#include "main.h"
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_EPD.h>
@@ -70,18 +70,18 @@ void scientific_rak14000(void)
 	{
 		g_status_changed = true;
 	}
-	if (g_air_status == 0)
-	{
-		set_rgb_color(RGB_BLUE);
-	}
-	else if (g_air_status == 128)
-	{
-		set_rgb_color(RGB_YELLOW);
-	}
-	else
-	{
-		set_rgb_color(RGB_RED);
-	}
+	// if (g_air_status == 0)
+	// {
+	// 	set_rgb_color(RGB_BLUE);
+	// }
+	// else if (g_air_status == 128)
+	// {
+	// 	set_rgb_color(RGB_YELLOW);
+	// }
+	// else
+	// {
+	// 	set_rgb_color(RGB_RED);
+	// }
 
 	display.setFont(SMALL_FONT);
 	display.setTextSize(1);
@@ -155,7 +155,7 @@ void voc_rak14000(void)
 	// Write value
 	display.drawBitmap(x_text, y_text, voc_img, 32, 32, txt_color);
 
-	if (!voc_valid)
+	if (!g_voc_valid)
 	{
 		snprintf(disp_text, 29, "VOC na");
 	}
@@ -201,10 +201,6 @@ void voc_rak14000(void)
 						 txt_color);
 	}
 	display.drawLine(x_graph, y_graph + h_bar, x_graph + display_width / 2, y_graph + h_bar, (uint16_t)txt_color);
-
-	// For partial update only
-	// MYLOG("EPD", "Updating x1 %d y1 %d x2 %d y2 %d", x_text, y_text, x_text + w_text, y_text + h_text);
-	// display.displayPartial(x_text, y_text, x_text + w_text, y_text + h_text);
 }
 
 /**
@@ -693,7 +689,7 @@ void light_rak14000(bool has_pm)
 
 		text_rak14000(display_width - txt_w - 3, y_text + spacer + 4, disp_text, (uint16_t)txt_color, 1);
 
-		snprintf(disp_text, 29, "%.1f ", last_light_lux);
+		snprintf(disp_text, 29, "%.1f ", g_last_light_lux);
 		display.setFont(LARGE_FONT);
 		display.setTextSize(1);
 		display.getTextBounds(disp_text, 0, 0, &txt_x1, &txt_y1, &txt_w2, &txt_h);
@@ -705,7 +701,7 @@ void light_rak14000(bool has_pm)
 		// Write value
 		display.drawBitmap(x_text, y_text, brightness_img, 32, 32, txt_color);
 
-		snprintf(disp_text, 29, "%.2f", last_light_lux);
+		snprintf(disp_text, 29, "%.2f", g_last_light_lux);
 
 		display.setFont(LARGE_FONT);
 		display.setTextSize(1);

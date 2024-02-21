@@ -26,28 +26,6 @@ def create_uf2(source, target, env):
     print(target + " is ready to flash to target device")
     print("#########################################################")
 
-# # Create bootloader UF2
-#     # source_hex = target[0].get_abspath()
-#     # source_hex = target[0].get_string(False)
-#     source_hex2 = '.\\Debug-Build\\wiscore_rak4631_board_bootloader-0.4.3.hex'
-#     print("#########################################################")
-#     print("Create Bootloader UF2 from "+source_hex2)
-#     print("#########################################################")
-#     # print("Source: " + source_hex)
-#     # target = source_hex.replace(".hex", "")
-#     target2 = ".\\Debug-Build\\wiscore_rak4631_board_bootloader-0.4.3.uf2"
-#     print("Bootloader Target: " + target2)
-
-#     with open(source_hex2, mode='rb') as f2:
-#         inpbuf2 = f2.read()
-
-#     outbuf2 = convert_from_hex_to_uf2(inpbuf2.decode("utf-8"))
-
-#     write_file(target2, outbuf2)
-#     print("#########################################################")
-#     print(target2 + " bootloader is ready to flash to target device")
-#     print("#########################################################")
-
 
 # Add callback after .hex file was created
 env.AddPostAction("$BUILD_DIR/${PROGNAME}.hex", create_uf2)

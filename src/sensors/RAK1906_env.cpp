@@ -2,13 +2,13 @@
  * @file RAK1906_env.cpp
  * @author Bernd Giesecke (bernd.giesecke@rakwireless.com)
  * @brief BME680 sensor functions
- * @version 0.1
- * @date 2021-05-29
+ * @version 0.2
+ * @date 2024-02-21
  *
- * @copyright Copyright (c) 2021
+ * @copyright Copyright (c) 2024
  *
  */
-#include "app.h"
+#include "main.h"
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME680.h>
 
@@ -18,12 +18,8 @@ Adafruit_BME680 bme(&Wire);
 // Might need adjustments
 #define SEALEVELPRESSURE_HPA (1010.0)
 
-/** Last temperature read */
-float _last_temp_rak1906 = 0;
-/** Last humidity read */
-float _last_humid_rak1906 = 0;
 /** Last pressure read */
-float _last_pressure_rak1906 = 0;
+float g_last_pressure = 0;
 
 /**
  * @brief Initialize the BME680 sensor
@@ -49,17 +45,9 @@ bool init_rak1906(void)
 	bme.setGasHeater(0, 0); // switch off
 	MYLOG("BME", "Setup BME680 sensor finished");
 
-	return true;
-}
+	shutdown_rak1906();
 
-/**
- * @brief Start sensing on the BME6860
- *
- */
-void start_rak1906(void)
-{
-	MYLOG("BME", "Start BME reading");
-	bme.beginReading();
+	return true;
 }
 
 /**
@@ -74,7 +62,6 @@ void start_rak1906(void)
  */
 bool read_rak1906()
 {
-	// start_rak1906();
 	time_t wait_start = millis();
 	bool read_success = false;
 	while ((millis() - wait_start) < 5000)
@@ -98,9 +85,9 @@ bool read_rak1906()
 	g_solution_data.addBarometricPressure(LPP_CHANNEL_PRESS_2, (float)(bme.pressure) / 100.0);
 	// g_solution_data.addAnalogInput(LPP_CHANNEL_GAS_2, (float)(bme.gas_resistance) / 1000.0);
 
-	_last_temp_rak1906 = bme.temperature;
-	_last_humid_rak1906 = bme.humidity;
-	_last_pressure_rak1906 = (float)(bme.pressure) / 100.0;
+	g_last_temp = bme.temperature;
+	g_last_humid = bme.humidity;
+	g_last_pressure = (float)(bme.pressure) / 100.0;
 
 #if MY_DEBUG > 0
 	MYLOG("BME", "RH= %.2f T= %.2f", bme.humidity, bme.temperature);
@@ -124,7 +111,26 @@ bool read_rak1906()
  */
 void get_rak1906_values(float *values)
 {
-	values[0] = _last_temp_rak1906;
-	values[1] = _last_humid_rak1906;
-	values[2] = _last_pressure_rak1906;
+	values[0] = g_last_temp;
+	values[1] = g_last_humid;
+	values[2] = g_last_pressure;
+}
+
+/**
+ * @brief Wake up RAK1906 from sleep
+ *
+ */
+void startup_rak1906(void)
+{
+	MYLOG("BME", "Start BME reading");
+	bme.beginReading();
+}
+
+/**
+ * @brief Put the RAK1906 into sleep mode
+ *
+ */
+void shutdown_rak1906(void)
+{
+	// No low power functionality found
 }

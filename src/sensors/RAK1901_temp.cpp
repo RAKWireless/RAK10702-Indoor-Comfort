@@ -2,22 +2,22 @@
  * @file RAK1901_temp.cpp
  * @author Bernd Giesecke (bernd.giesecke@rakwireless.com)
  * @brief Initialize and read data from SHTC3 sensor
- * @version 0.2
- * @date 2022-01-30
+ * @version 0.3
+ * @date 2024-02-21
  *
- * @copyright Copyright (c) 2022
+ * @copyright Copyright (c) 2024
  *
  */
-#include "app.h"
+#include "main.h"
 #include "SparkFun_SHTC3.h"
 
 /** Sensor instance */
 SHTC3 shtc3;
 
 /** Last temperature read */
-float _last_temp = 0;
+float g_last_temp = 0;
 /** Last humidity read */
-float _last_humid = 0;
+float g_last_humid = 0;
 
 /**
  * @brief Initialize the temperature and humidity sensor
@@ -32,6 +32,7 @@ bool init_rak1901(void)
 		MYLOG("T_H", "Could not initialize SHTC3");
 		return false;
 	}
+	shutdown_rak1901();
 	return true;
 }
 
@@ -55,8 +56,8 @@ void read_rak1901(void)
 
 		g_solution_data.addRelativeHumidity(LPP_CHANNEL_HUMID, shtc3.toPercent());
 		g_solution_data.addTemperature(LPP_CHANNEL_TEMP, shtc3.toDegC());
-		_last_temp = shtc3.toDegC();
-		_last_humid = shtc3.toPercent();
+		g_last_temp = shtc3.toDegC();
+		g_last_humid = shtc3.toPercent();
 
 #if HAS_EPD > 0
 		set_humid_rak14000(shtc3.toPercent());
@@ -66,8 +67,8 @@ void read_rak1901(void)
 	else
 	{
 		MYLOG("T_H", "Reading SHTC3 failed");
-		_last_temp = 0.0;
-		_last_humid = 0.0;
+		g_last_temp = 0.0;
+		g_last_humid = 0.0;
 	}
 }
 
@@ -79,8 +80,9 @@ void read_rak1901(void)
  */
 void get_rak1901_values(float *values)
 {
-		values[0] = _last_temp;
-		values[1] = _last_humid;
+		values[0] = g_last_temp;
+		values[1] = g_last_humid;
+		values[2] = g_last_pressure;
 		return;
 }
 
@@ -88,7 +90,7 @@ void get_rak1901_values(float *values)
  * @brief Wake up RAK1901 from sleep
  *
  */
-void start_up_rak1901(void)
+void startup_rak1901(void)
 {
 	shtc3.wake(false);
 	shtc3.update();
@@ -98,7 +100,8 @@ void start_up_rak1901(void)
  * @brief Put the RAK1901 into sleep mode
  * 
  */
-void shut_down_rak1901(void)
+void shutdown_rak1901(void)
 {
 	shtc3.sleep(true);
+	delay(250);
 }

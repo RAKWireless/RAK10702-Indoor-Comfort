@@ -2,20 +2,17 @@
  * @file RAK12010_light.cpp
  * @author Bernd Giesecke (bernd.giesecke@rakwireless.com)
  * @brief Functions for RAK12010 light sensor
- * @version 0.1
- * @date 2022-02-01
+ * @version 0.2
+ * @date 2024-02-21
  *
- * @copyright Copyright (c) 2022
+ * @copyright Copyright (c) 2024
  *
  */
-#include "app.h"
+#include "main.h"
 #include "Light_VEML7700.h"
 
 /** Light sensor instance */
 Light_VEML7700 VEML = Light_VEML7700();
-
-/** Light value */
-float last_light_lux = 0.0;
 
 /**
  * @brief Initialize light sensor
@@ -40,6 +37,8 @@ bool init_rak12010(void)
 	VEML.setGain(VEML7700_GAIN_2);
 	VEML.setIntegrationTime(VEML7700_IT_400MS);
 
+	shutdown_rak12010();
+
 	return true;
 }
 
@@ -51,14 +50,14 @@ bool init_rak12010(void)
  */
 void read_rak12010(void)
 {
-	last_light_lux = VEML.readLux();
+	g_last_light_lux = VEML.readLux();
 #if MY_DEBUG > 0
 	float light_white = VEML.readWhite();
 	float light_als = VEML.readALS();
-	MYLOG("VEML", "L: %.2fLux W: %.2f ALS: %.2f", last_light_lux, light_white, light_als);
+	MYLOG("VEML", "L: %.2fLux W: %.2f ALS: %.2f", g_last_light_lux, light_white, light_als);
 #endif
 
-	g_solution_data.addLuminosity(LPP_CHANNEL_LIGHT2, (uint32_t)last_light_lux);
+	g_solution_data.addLuminosity(LPP_CHANNEL_LIGHT2, (uint32_t)g_last_light_lux);
 }
 
 /**
@@ -76,8 +75,10 @@ void startup_rak12010(void)
  * @brief Put the RAK12010 into sleep mode
  *
  */
-void shut_down_rak12010(void)
+void shutdown_rak12010(void)
 {
-	VEML.powerSaveEnable(true);
 	VEML.setPowerSaveMode(VEML7700_POWERSAVE_MODE4);
+	delay(250);
+	VEML.powerSaveEnable(true);
+	delay(250);
 }
