@@ -47,6 +47,9 @@ bool has_rak12039 = false;
 bool has_rak12047 = false;
 bool has_rgb = false;
 
+/** Counter for connection check with confirmed packet */
+uint8_t check_connection = 0;
+
 /**
  * @brief Initial setup of the application (before LoRaWAN and BLE setup)
  *
@@ -134,7 +137,7 @@ bool init_app(void)
 	g_is_using_battery = batt_val < 1000.0 ? false : true;
 
 	/// \todo only for testing
-	// g_is_using_battery = false;
+	// g_is_using_battery = true;
 
 	Wire.begin();
 	delay(100);
@@ -232,10 +235,11 @@ bool init_app(void)
 	init_button();
 
 	if (g_is_using_battery)
-{		// Switch off RGB
+	{
+		// Switch off RGB
 		set_rgb_color(0, 0, 0);
-	shutdown_rgb();
-}
+		shutdown_rgb();
+	}
 	if (has_rgb)
 	{
 		MYLOG("APP", "Start RGB toggle timer");
@@ -402,6 +406,17 @@ void app_event_handler(void)
 		{
 			if (g_lpwan_has_joined)
 			{
+				// Send a confirmed package every 30 packets to check connection
+				if (check_connection > 30)
+				{
+					g_lorawan_settings.confirmed_msg_enabled = LMH_CONFIRMED_MSG;
+					check_connection = 0;
+				}
+				else
+				{
+					g_lorawan_settings.confirmed_msg_enabled = LMH_UNCONFIRMED_MSG;
+				}
+				check_connection++;
 
 				lmh_error_status result = send_lora_packet(g_solution_data.getBuffer(), g_solution_data.getSize(), 2);
 				switch (result)
@@ -426,6 +441,7 @@ void app_event_handler(void)
 		}
 		else
 		{
+			g_solution_data.addDevID(LPP_CHANNEL_DEVID, &g_lorawan_settings.node_device_eui[4]);
 			send_p2p_packet(g_solution_data.getBuffer(), g_solution_data.getSize());
 		}
 
@@ -643,7 +659,7 @@ void lora_data_handler(void)
 		{
 			MYLOG("APP", "Join network failed");
 			/// \todo here join could be restarted.
-			// lmh_join();
+			lmh_join();
 		}
 	}
 

@@ -20,32 +20,41 @@
 #include "RAK14000_epd.h"
 
 // RAK19024 Base Board
-#define PIR_INT 25		// Interrupt pin for PIR
-#define BUTTON_INT 24	// Input pin for Button
-#define VOC_POWER 20	// VOC power enable pin
-#define PIR_POWER 2		// PIR power enable pin
-#define CO2_PM_POWER 28 // CO2 and PM power enable pin
-#define EPD_POWER 34	// EPD power enable pin
-#define SET_PIN WB_IO6	// PM sensor enable pin
+#if _CUSTOM_BOARD_ == 1		// RAK19024
+#define PIR_INT 25			// Interrupt pin for PIR
+#define BUTTON_INT 24		// Input pin for Button
+#define VOC_POWER 20		// VOC power enable pin
+#define PIR_POWER 2			// PIR power enable pin
+#define CO2_PM_POWER 28		// CO2 and PM power enable pin
+#define EPD_POWER 34		// EPD power enable pin
+#else						// RAK1900x
+#define PIR_INT WB_IO2		// Interrupt pin for PIR
+#define BUTTON_INT WB_SW1	// Input pin for Button
+#define VOC_POWER WB_IO2	// VOC power enable pin
+#define PIR_POWER WB_IO2	// PIR power enable pin
+#define CO2_PM_POWER WB_IO2 // CO2 and PM power enable pin
+#define EPD_POWER WB_IO2	// EPD power enable pin
+#endif
+#define SET_PIN WB_IO6 // PM sensor enable pin
 
 /** Wakeup triggers for application events */
-#define MOTION        0b1000000000000000
-#define N_MOTION      0b0111111111111111
-#define SEND_NOW      0b0100000000000000
-#define N_SEND_NOW    0b1011111111111111
-#define VOC_REQ       0b0010000000000000
-#define N_VOC_REQ     0b1101111111111111
-#define ROOM_EMPTY    0b0001000000000000
-#define N_ROOM_EMPTY  0b1110111111111111
-#define LED_REQ       0b0000100000000000
-#define N_LED_REQ     0b1111011111111111
-#define DISP_UPDATE   0b0000010000000000
+#define MOTION 0b1000000000000000
+#define N_MOTION 0b0111111111111111
+#define SEND_NOW 0b0100000000000000
+#define N_SEND_NOW 0b1011111111111111
+#define VOC_REQ 0b0010000000000000
+#define N_VOC_REQ 0b1101111111111111
+#define ROOM_EMPTY 0b0001000000000000
+#define N_ROOM_EMPTY 0b1110111111111111
+#define LED_REQ 0b0000100000000000
+#define N_LED_REQ 0b1111011111111111
+#define DISP_UPDATE 0b0000010000000000
 #define N_DISP_UPDATE 0b1111101111111111
-#define DISP_JOIN     0b0000001000000000
-#define N_DISP_JOIN   0b1111110111111111
-#define RST_REQ       0b0000000100000000
-#define N_RST_REQ     0b1111111011111111
-#define APP_EVENT     0b1111111110000001
+#define DISP_JOIN 0b0000001000000000
+#define N_DISP_JOIN 0b1111110111111111
+#define RST_REQ 0b0000000100000000
+#define N_RST_REQ 0b1111111011111111
+#define APP_EVENT 0b1111111110000001
 
 // Structures and Unions
 /** RTC date/time structure */
@@ -63,7 +72,7 @@ struct date_time_s
 /** Define the version of your SW */
 #ifndef SW_VERSION_1
 #define SW_VERSION_1 1 // major version increase on API change / not backwards compatible
-#define SW_VERSION_2 0 // minor version increase on API change / backward compatible
+#define SW_VERSION_2 1 // minor version increase on API change / backward compatible
 #define SW_VERSION_3 0 // patch version increase on bugfix, no affect on API
 #endif
 

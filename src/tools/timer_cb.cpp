@@ -11,8 +11,9 @@
 #include "main.h"
 
 /**
- * @brief Timer function used to avoid sending packages too often.
- * 			Delays the next package by 10 seconds
+ * @brief Timer function used to power up the sensors for a given time.
+ * 		  This allows the sensors to do multiple measurements before a 
+ *        final reading is done.
  *
  * @param unused Timer handle, not used
  */

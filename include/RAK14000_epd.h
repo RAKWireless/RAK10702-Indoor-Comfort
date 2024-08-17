@@ -171,7 +171,7 @@ extern GFXfont RAK_EPD_20pt;
 #define EPD_CS SS
 #define EPD_DC WB_IO1
 #define SRAM_CS -1	 // not use
-#define EPD_RESET - 1 // not use
+#define EPD_RESET -1 // not use
 #define EPD_BUSY WB_IO4
 
 #define RGB_BLUE 0,0,255

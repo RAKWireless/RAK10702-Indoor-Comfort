@@ -29,9 +29,30 @@ bool init_rak12002(void)
 
 	rtc.useEEPROM();
 
+	// Direct Switching Mode (DSM): when VDD < VBACKUP, switchover occurs from VDD to VBACKUP
 	rtc.writeToRegister(0x35, 0x00);
-	rtc.writeToRegister(0x37, 0xB4); // Direct Switching Mode (DSM): when VDD < VBACKUP, switchover occurs from VDD to VBACKUP
+	rtc.writeToRegister(0x37, 0xB4); 
 
+	// Disable timers
+	rtc.writeToRegister(0x0A, 0x00);
+	rtc.writeToRegister(0x0B, 0x00);
+
+	// Disable clock output
+	uint8_t reg_value = rtc.readFromRegister(0x0F);
+	reg_value = reg_value & 0b11111011;
+	rtc.writeToRegister(0x0F, reg_value);
+
+	// Disable interrupts
+	reg_value = rtc.readFromRegister(0x10);
+	reg_value = reg_value & 0b00000010;
+	rtc.writeToRegister(0x10, reg_value);
+
+	// Disable Clock Interrupts
+	reg_value = rtc.readFromRegister(0x12);
+	reg_value = reg_value & 0b00000000;
+	rtc.writeToRegister(0x12, reg_value);
+
+	// Disable EEPROM
 	// rtc.useEEPROM(false);
 
 	rtc.set24HourMode(); // Set the device to use the 24hour format (default) instead of the 12 hour format
